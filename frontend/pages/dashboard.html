@@ -3,99 +3,133 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard — SynergySphere</title>
+  <title>Dashboard - SynergySphere</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
-  <div class="app">
-    <!-- SIDEBAR -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <div class="brand-icon">⚡</div>
-        <div>
-          <div class="brand-name">SynergySphere</div>
-          <div class="brand-tagline">Team Collaboration</div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>Connected workspaces for teams that ship together.</p>
         </div>
       </div>
-      <nav class="sidebar-nav">
-        <div class="nav-section-label">Menu</div>
-        <a class="nav-item active" href="/dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
-        <a class="nav-item" href="/myday.html"><span class="nav-icon">☀️</span> My Day</a>
-        <div class="nav-section-label" style="margin-top:8px;">Projects</div>
-        <div id="sidebar-projects"></div>
+
+      <button class="new-project-btn" onclick="openCreateProject()">Create Project</button>
+
+      <nav class="nav">
+        <a class="nav-link active" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>Dashboard</span></a>
+        <a class="nav-link" href="/projects.html"><span class="nav-icon nav-projects"></span><span>Projects</span></a>
+        <a class="nav-link" href="/tasks.html"><span class="nav-icon nav-tasks"></span><span>Tasks</span></a>
+        <a class="nav-link" href="/team.html"><span class="nav-icon nav-team"></span><span>Team</span></a>
+        <a class="nav-link" href="/myday.html"><span class="nav-icon nav-myday"></span><span>My Day</span></a>
+        <a class="nav-link" href="/settings.html"><span class="nav-icon nav-settings"></span><span>Settings</span></a>
       </nav>
-      <div class="sidebar-footer">
-        <div class="user-info" onclick="handleLogout()">
-          <div id="sidebar-avatar"></div>
-          <div>
-            <div class="user-name" id="sidebar-name"></div>
-            <div class="user-email" style="color:var(--text-tertiary);">Sign out</div>
-          </div>
+
+      <button class="sidebar-user" onclick="confirmLogout()">
+        <div id="sidebar-avatar" class="avatar-lite">U</div>
+        <div>
+          <div class="name" id="sidebar-name">User</div>
+          <div class="role" id="sidebar-role">Sign out</div>
         </div>
-      </div>
+      </button>
     </aside>
 
-    <!-- MAIN -->
-    <div class="main-content">
+    <main class="main">
       <header class="topbar">
-        <div class="topbar-left">
-          <h1>Dashboard</h1>
-          <p>Overview of all your projects</p>
+        <div>
+          <h2 class="page-title">Workspace Dashboard</h2>
+          <p class="page-subtitle">A live snapshot of project health, workload, and the work due next.</p>
         </div>
-        <div class="topbar-right" style="position:relative;">
-          <button class="notif-btn" onclick="toggleNotifPanel()">
-            🔔 <span class="notif-badge" id="notif-count" style="display:none;">0</span>
-          </button>
-          <div class="notif-panel" id="notif-panel">
-            <div class="notif-panel-header">
-              <span class="notif-panel-title">Notifications</span>
-              <button class="btn btn-sm btn-ghost" onclick="markAllRead()">Mark all read</button>
-            </div>
-            <div class="notif-list" id="notif-list"></div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="openCreateProject()">+ New Project</button>
+        <div class="topbar-actions">
+          <div class="user-chip" id="topbar-user"></div>
         </div>
       </header>
 
-      <div class="page-body">
-        <div class="stats-grid" id="stats-grid"></div>
-        <div class="flex items-center justify-between mb-16">
-          <h2 style="font-size:1.1rem; font-weight:500;">Your Projects</h2>
+      <section class="content">
+        <div class="page-section">
+          <div class="section-header">
+            <div>
+              <h3 class="section-title">Overview</h3>
+              <p class="section-copy">Everything important from your projects in one place.</p>
+            </div>
+          </div>
+          <div class="stats-grid" id="stats-grid"></div>
         </div>
-        <div class="project-grid" id="project-grid"></div>
-      </div>
-    </div>
+
+        <div class="page-section split-layout">
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Recent Projects</div>
+                  <div class="panel-copy">Track momentum, ownership, and completion across your active work.</div>
+                </div>
+                <a class="btn-soft" href="/projects.html">Open Projects</a>
+              </div>
+              <div class="list" id="project-list"></div>
+            </div>
+
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">My Day Snapshot</div>
+                  <div class="panel-copy">Tasks due today, overdue work, and what needs attention next.</div>
+                </div>
+                <a class="btn-soft" href="/myday.html">Open My Day</a>
+              </div>
+              <div class="list" id="myday-list"></div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Notifications</div>
+                  <div class="panel-copy">Fresh updates from assignments, deadlines, and project changes.</div>
+                </div>
+                <button class="btn-soft" onclick="markAllNotificationsRead()">Mark all read</button>
+              </div>
+              <div class="message-list" id="notif-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- CREATE PROJECT MODAL -->
   <div class="modal-overlay" id="modal-create-project">
     <div class="modal">
       <div class="modal-header">
-        <h3 class="modal-title">Create new project</h3>
-        <button class="modal-close" onclick="closeModal('modal-create-project')">✕</button>
+        <h3 class="section-title" style="font-size:1.6rem;">Create Project</h3>
+        <p class="panel-copy">Start a fresh workspace and invite your team after it is created.</p>
       </div>
       <form onsubmit="createProject(event)">
-        <div class="form-group">
-          <label class="form-label">Project name</label>
-          <input class="form-input" id="cp-name" placeholder="e.g. E-Commerce Platform" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Description</label>
-          <textarea class="form-textarea" id="cp-desc" placeholder="What's this project about?"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Theme color</label>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#1a73e8" checked style="display:none;"><span class="filter-chip active" data-color="#1a73e8" onclick="selectColor(this)">🔵 Blue</span></label>
-            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#1e8e3e" style="display:none;"><span class="filter-chip" data-color="#1e8e3e" onclick="selectColor(this)">🟢 Green</span></label>
-            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#9334e6" style="display:none;"><span class="filter-chip" data-color="#9334e6" onclick="selectColor(this)">🟣 Purple</span></label>
-            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#e8710a" style="display:none;"><span class="filter-chip" data-color="#e8710a" onclick="selectColor(this)">🟠 Orange</span></label>
-            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#d93025" style="display:none;"><span class="filter-chip" data-color="#d93025" onclick="selectColor(this)">🔴 Red</span></label>
+        <div class="form-grid">
+          <div class="form-row">
+            <label class="form-label" for="cp-name">Project name</label>
+            <input id="cp-name" required>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="cp-color">Accent color</label>
+            <select id="cp-color">
+              <option value="#5b57f5">Indigo</option>
+              <option value="#1c9c67">Emerald</option>
+              <option value="#cf4a61">Rose</option>
+              <option value="#0a7f8b">Teal</option>
+            </select>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onclick="closeModal('modal-create-project')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create</button>
+        <div class="form-row" style="margin-top:16px;">
+          <label class="form-label" for="cp-desc">Description</label>
+          <textarea id="cp-desc" placeholder="What is this project trying to deliver?"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-soft" onclick="closeModal('modal-create-project')">Cancel</button>
+          <button type="submit" class="action-btn">Create Project</button>
         </div>
       </form>
     </div>
@@ -103,139 +137,167 @@
 
   <script src="/assets/js/api.js"></script>
   <script>
-    if (!requireAuth()) throw 'auth';
-    const user = getUser();
-    document.getElementById('sidebar-avatar').innerHTML = avatarHtml(user.name, user.avatarColor, 'md');
-    document.getElementById('sidebar-name').textContent = user.name;
+    if (!requireAuth()) throw new Error('auth required');
 
-    function selectColor(el) {
-      document.querySelectorAll('[data-color]').forEach(c => c.classList.remove('active'));
-      el.classList.add('active');
-      el.closest('label').querySelector('input').checked = true;
+    const user = getUser();
+    document.getElementById('sidebar-avatar').textContent = initials(user.name);
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
+    document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
+
+    function openCreateProject() {
+      document.getElementById('modal-create-project').classList.add('open');
     }
 
-    async function loadDashboard() {
-      const projects = await api('/projects');
-      if (!projects) return;
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
 
-      let totalTasks = 0, doneTasks = 0, overdueTasks = 0, totalMembers = new Set();
-      projects.forEach(p => {
-        totalTasks += p.stats.total;
-        doneTasks += p.stats.done;
-        overdueTasks += p.stats.overdue;
-        p.members.forEach(m => totalMembers.add(m.user._id));
-      });
-      const pct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+    function renderStats(projects) {
+      const totalProjects = projects.length;
+      const activeProjects = projects.filter((project) => project.stats.total > 0 && project.stats.pct < 100).length;
+      const pendingTasks = projects.reduce((sum, project) => sum + Math.max(project.stats.total - project.stats.done, 0), 0);
+      const completedTasks = projects.reduce((sum, project) => sum + project.stats.done, 0);
 
       document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card fade-in">
-          <div class="stat-icon-wrap blue">📁</div>
-          <div><div class="stat-value">${projects.length}</div><div class="stat-label">Active Projects</div></div>
-        </div>
-        <div class="stat-card fade-in" style="animation-delay:0.05s;">
-          <div class="stat-icon-wrap yellow">📋</div>
-          <div><div class="stat-value">${totalTasks}</div><div class="stat-label">Total Tasks</div></div>
-        </div>
-        <div class="stat-card fade-in" style="animation-delay:0.1s;">
-          <div class="stat-icon-wrap green">✅</div>
-          <div>
-            <div class="stat-value">${pct}%</div><div class="stat-label">Completed</div>
-            <div class="stat-change text-success">${doneTasks} of ${totalTasks} done</div>
-          </div>
-        </div>
-        <div class="stat-card fade-in" style="animation-delay:0.15s;">
-          <div class="stat-icon-wrap red">🚨</div>
-          <div>
-            <div class="stat-value">${overdueTasks}</div><div class="stat-label">Overdue</div>
-            ${overdueTasks > 0 ? '<div class="stat-change text-danger">Needs attention</div>' : '<div class="stat-change text-success">All on track</div>'}
-          </div>
-        </div>
+        <article class="stat-card">
+          <div class="stat-icon total">PR</div>
+          <div><div class="stat-title">Total Projects</div><div class="stat-value">${totalProjects}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon active">AC</div>
+          <div><div class="stat-title">Active Projects</div><div class="stat-value">${activeProjects}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon pending">PD</div>
+          <div><div class="stat-title">Pending Tasks</div><div class="stat-value">${pendingTasks}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon completed">DN</div>
+          <div><div class="stat-title">Completed Tasks</div><div class="stat-value">${completedTasks}</div></div>
+        </article>
       `;
+    }
 
-      if (projects.length === 0) {
-        document.getElementById('project-grid').innerHTML = `
-          <div class="empty-state" style="grid-column:1/-1;">
-            <div class="empty-icon">📂</div>
-            <div class="empty-text">No projects yet</div>
-            <div class="empty-sub">Create your first project to get started</div>
-            <button class="btn btn-primary" onclick="openCreateProject()" style="margin-top:16px;">+ New Project</button>
-          </div>`;
-        document.getElementById('sidebar-projects').innerHTML = '';
+    function renderProjects(projects) {
+      if (!projects.length) {
+        document.getElementById('project-list').innerHTML = '<div class="empty">No projects yet. Create one to start collaborating.</div>';
         return;
       }
 
-      document.getElementById('project-grid').innerHTML = projects.map((p, i) => `
-        <div class="project-card fade-in" style="--proj-color:${p.color}; animation-delay:${i*0.05}s;" onclick="window.location.href='/project.html?id=${p._id}'">
-          <div class="project-card-header">
+      document.getElementById('project-list').innerHTML = projects.slice(0, 4).map((project) => `
+        <article class="project-card">
+          <div class="section-header" style="margin-bottom:0;">
             <div>
-              <div class="project-name">${p.name}</div>
-              <div class="project-desc">${p.description || 'No description'}</div>
+              <div class="project-title">${escapeHtml(project.name)}</div>
+              <div class="project-meta">${escapeHtml(project.description || 'No description yet')}</div>
             </div>
-            ${p.stats.overdue > 0 ? '<span class="badge badge-red">⚠ ' + p.stats.overdue + ' overdue</span>' : ''}
+            <span class="pill pill-muted">${project.members.length} members</span>
           </div>
-          <div class="project-progress">
-            <div class="flex items-center justify-between">
-              <span class="text-xs text-muted">${p.stats.done}/${p.stats.total} tasks</span>
-              <span class="text-xs" style="font-weight:600;">${p.stats.pct}%</span>
+          <div class="meta-grid">
+            <div class="meta-card">
+              <div class="meta-label">Progress</div>
+              <div class="meta-value">${project.stats.pct}% complete</div>
             </div>
-            <div class="progress-bar"><div class="progress-fill" style="width:${p.stats.pct}%; background:${p.color};"></div></div>
-          </div>
-          <div class="project-card-footer">
-            <div class="avatar-group">
-              ${p.members.slice(0,4).map(m => avatarHtml(m.user.name, m.user.avatarColor, 'sm')).join('')}
-              ${p.members.length > 4 ? `<div class="avatar avatar-sm" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.6rem;">+${p.members.length-4}</div>` : ''}
+            <div class="meta-card">
+              <div class="meta-label">Overdue</div>
+              <div class="meta-value">${project.stats.overdue} tasks</div>
             </div>
-            <span class="text-xs text-muted">${p.members.length} members</span>
           </div>
-        </div>
-      `).join('');
-
-      document.getElementById('sidebar-projects').innerHTML = projects.map(p => `
-        <div class="project-nav-item" onclick="window.location.href='/project.html?id=${p._id}'">
-          <span class="project-nav-dot" style="background:${p.color}"></span>
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
-        </div>
+          <div class="mini-progress"><div style="width:${project.stats.pct}%; background:${escapeHtml(project.color || '#5b57f5')}"></div></div>
+          <div class="inline-actions">
+            <a class="btn-soft" href="/project.html?id=${project._id}">Open Workspace</a>
+          </div>
+        </article>
       `).join('');
     }
 
-    async function loadNotifications() {
-      const notes = await api('/notifications');
-      if (!notes) return;
-      const unread = notes.filter(n => !n.isRead);
-      const badge = document.getElementById('notif-count');
-      if (unread.length > 0) { badge.textContent = unread.length; badge.style.display = 'flex'; }
-      else { badge.style.display = 'none'; }
-      document.getElementById('notif-list').innerHTML = notes.length === 0
-        ? '<div class="empty-state"><div class="empty-icon">🔕</div><div class="empty-text">No notifications</div></div>'
-        : notes.map(n => `<div class="notif-item ${n.isRead ? '' : 'unread'}" onclick="markRead('${n._id}',this)">
-            <div><div class="notif-msg">${n.message}</div><div class="notif-meta">${timeAgo(n.createdAt)}</div></div>
-          </div>`).join('');
-    }
-    function toggleNotifPanel() { document.getElementById('notif-panel').classList.toggle('open'); }
-    async function markRead(id, el) { await api(`/notifications/${id}/read`, { method: 'PATCH' }); if (el) el.classList.remove('unread'); loadNotifications(); }
-    async function markAllRead() { await api('/notifications/read-all', { method: 'PATCH' }); loadNotifications(); showToast('All marked as read', 'success'); }
+    function renderMyDay(data) {
+      const items = [
+        ...data.overdue.map((task) => ({ ...task, label: 'Overdue', tone: 'pill-danger' })),
+        ...data.todayTasks.map((task) => ({ ...task, label: 'Today', tone: 'pill-muted' })),
+        ...data.dueSoon.map((task) => ({ ...task, label: 'Due Soon', tone: 'pill-ok' })),
+      ];
 
-    function openCreateProject() { document.getElementById('modal-create-project').classList.add('open'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-    async function createProject(e) {
-      e.preventDefault();
-      const checkedRadio = document.querySelector('input[name="proj-color"]:checked');
-      const data = await api('/projects', { method: 'POST', body: JSON.stringify({
-        name: document.getElementById('cp-name').value,
-        description: document.getElementById('cp-desc').value,
-        color: checkedRadio ? checkedRadio.value : '#1a73e8',
-      })});
-      if (data) { closeModal('modal-create-project'); showToast('Project created!', 'success'); loadDashboard(); }
+      if (!items.length) {
+        document.getElementById('myday-list').innerHTML = '<div class="empty">No urgent work right now. Your day is clear.</div>';
+        return;
+      }
+
+      document.getElementById('myday-list').innerHTML = items.slice(0, 6).map((task) => `
+        <div class="list-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(task.title)}</div>
+              <div class="task-sub">${escapeHtml(task.project?.name || 'Project')} - ${fmtDate(task.dueDate)}</div>
+            </div>
+            <span class="pill ${task.tone}">${task.label}</span>
+          </div>
+        </div>
+      `).join('');
     }
 
-    function handleLogout() { if (confirm('Sign out?')) { clearAuth(); window.location.href = '/index.html'; } }
+    function renderNotifications(notes) {
+      if (!notes.length) {
+        document.getElementById('notif-list').innerHTML = '<div class="empty">No notifications yet. You are up to date.</div>';
+        return;
+      }
 
-    loadDashboard(); loadNotifications();
-    setInterval(loadNotifications, 30000);
-    document.addEventListener('click', e => {
-      const p = document.getElementById('notif-panel'), b = document.querySelector('.notif-btn');
-      if (p.classList.contains('open') && !p.contains(e.target) && !b.contains(e.target)) p.classList.remove('open');
-    });
+      document.getElementById('notif-list').innerHTML = notes.map((note) => `
+        <div class="message-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(note.message)}</div>
+              <div class="message-meta">${timeAgo(note.createdAt)}</div>
+            </div>
+            ${note.isRead ? '<span class="pill pill-muted">Read</span>' : `<button class="btn-soft" onclick="markNotificationRead('${note._id}')">Mark read</button>`}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadDashboard() {
+      const [projects, myDay, notes] = await Promise.all([
+        api('/projects'),
+        api('/myday'),
+        api('/notifications'),
+      ]);
+
+      renderStats(projects || []);
+      renderProjects(projects || []);
+      renderMyDay(myDay || { overdue: [], todayTasks: [], dueSoon: [] });
+      renderNotifications(notes || []);
+    }
+
+    async function createProject(event) {
+      event.preventDefault();
+      const created = await api('/projects', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: document.getElementById('cp-name').value,
+          description: document.getElementById('cp-desc').value,
+          color: document.getElementById('cp-color').value,
+        }),
+      });
+
+      if (!created) return;
+      closeModal('modal-create-project');
+      showToast('Project created successfully.', 'success');
+      event.target.reset();
+      loadDashboard();
+    }
+
+    async function markNotificationRead(id) {
+      const updated = await api(`/notifications/${id}/read`, { method: 'PATCH' });
+      if (updated) loadDashboard();
+    }
+
+    async function markAllNotificationsRead() {
+      const updated = await api('/notifications/read-all', { method: 'PATCH' });
+      if (updated) loadDashboard();
+    }
+
+    loadDashboard();
   </script>
 </body>
 </html>

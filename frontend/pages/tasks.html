@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tasks - SynergySphere</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>Connected workspaces for teams that ship together.</p>
+        </div>
+      </div>
+
+      <button class="new-project-btn" onclick="openTaskModal()">Create Task</button>
+
+      <nav class="nav">
+        <a class="nav-link" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>Dashboard</span></a>
+        <a class="nav-link" href="/projects.html"><span class="nav-icon nav-projects"></span><span>Projects</span></a>
+        <a class="nav-link active" href="/tasks.html"><span class="nav-icon nav-tasks"></span><span>Tasks</span></a>
+        <a class="nav-link" href="/team.html"><span class="nav-icon nav-team"></span><span>Team</span></a>
+        <a class="nav-link" href="/myday.html"><span class="nav-icon nav-myday"></span><span>My Day</span></a>
+        <a class="nav-link" href="/settings.html"><span class="nav-icon nav-settings"></span><span>Settings</span></a>
+      </nav>
+
+      <button class="sidebar-user" onclick="confirmLogout()">
+        <div id="sidebar-avatar" class="avatar-lite">U</div>
+        <div>
+          <div class="name" id="sidebar-name">User</div>
+          <div class="role" id="sidebar-role">Sign out</div>
+        </div>
+      </button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 class="page-title">Tasks</h2>
+          <p class="page-subtitle">Create, update, and filter every task across your projects from one queue.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-chip" id="topbar-user"></div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="toolbar">
+          <div class="search-box">
+            <input id="search-input" placeholder="Search tasks..." oninput="renderTasks()">
+          </div>
+          <div class="toolbar-actions">
+            <button class="btn-soft" onclick="setFilter('all')">Reset Filters</button>
+            <button class="action-btn" onclick="openTaskModal()">New Task</button>
+          </div>
+        </div>
+
+        <div class="tab-row" id="tab-row"></div>
+        <div class="list" id="task-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal-task">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="section-title" style="font-size:1.6rem;" id="task-modal-title">Create Task</h3>
+        <p class="panel-copy">Connect the task to a project, assign it, and track progress with due dates.</p>
+      </div>
+      <form onsubmit="saveTask(event)">
+        <input type="hidden" id="task-id">
+        <div class="form-grid">
+          <div class="form-row">
+            <label class="form-label" for="task-project">Project</label>
+            <select id="task-project" onchange="populateAssigneeOptions()" required></select>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="task-assignee">Assignee</label>
+            <select id="task-assignee"></select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:16px;">
+          <label class="form-label" for="task-title">Task title</label>
+          <input id="task-title" required>
+        </div>
+        <div class="form-row" style="margin-top:16px;">
+          <label class="form-label" for="task-desc">Description</label>
+          <textarea id="task-desc" placeholder="What needs to happen for this task to be done?"></textarea>
+        </div>
+        <div class="form-grid" style="margin-top:16px;">
+          <div class="form-row">
+            <label class="form-label" for="task-status">Status</label>
+            <select id="task-status">
+              <option value="todo">To Do</option>
+              <option value="inprogress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="task-priority">Priority</label>
+            <select id="task-priority">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:16px;">
+          <label class="form-label" for="task-due">Due date</label>
+          <input id="task-due" type="date">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-soft" onclick="closeModal('modal-task')">Cancel</button>
+          <button type="button" class="btn-soft hidden" id="delete-task-btn" onclick="deleteTask()">Delete</button>
+          <button type="submit" class="action-btn">Save Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('auth required');
+
+    const user = getUser();
+    document.getElementById('sidebar-avatar').textContent = initials(user.name);
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
+    document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
+
+    let projects = [];
+    let tasks = [];
+    let statusFilter = 'all';
+
+    function taskStatusLabel(status) {
+      if (status === 'inprogress') return 'In Progress';
+      if (status === 'done') return 'Done';
+      return 'To Do';
+    }
+
+    function renderTabs() {
+      const all = tasks.length;
+      const todo = tasks.filter((task) => task.status === 'todo').length;
+      const inprogress = tasks.filter((task) => task.status === 'inprogress').length;
+      const done = tasks.filter((task) => task.status === 'done').length;
+
+      document.getElementById('tab-row').innerHTML = `
+        <button class="tab-chip ${statusFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">All (${all})</button>
+        <button class="tab-chip ${statusFilter === 'todo' ? 'active' : ''}" onclick="setFilter('todo')">To Do (${todo})</button>
+        <button class="tab-chip ${statusFilter === 'inprogress' ? 'active' : ''}" onclick="setFilter('inprogress')">In Progress (${inprogress})</button>
+        <button class="tab-chip ${statusFilter === 'done' ? 'active' : ''}" onclick="setFilter('done')">Done (${done})</button>
+      `;
+    }
+
+    function setFilter(next) {
+      statusFilter = next;
+      renderTabs();
+      renderTasks();
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    function openTaskModal(id = '') {
+      if (!projects.length) {
+        showToast('Create a project before adding tasks.', 'error');
+        return;
+      }
+
+      const task = id ? tasks.find((item) => item._id === id) : null;
+      document.getElementById('task-id').value = task?._id || '';
+      document.getElementById('task-modal-title').textContent = task ? 'Edit Task' : 'Create Task';
+      document.getElementById('delete-task-btn').classList.toggle('hidden', !task);
+
+      populateProjectOptions(task?.project || task?.projectId);
+      populateAssigneeOptions(task?.assignee?._id || task?.assignee || '');
+
+      document.getElementById('task-title').value = task?.title || '';
+      document.getElementById('task-desc').value = task?.description || '';
+      document.getElementById('task-status').value = task?.status || 'todo';
+      document.getElementById('task-priority').value = task?.priority || 'medium';
+      document.getElementById('task-due').value = task?.dueDate ? task.dueDate.substring(0, 10) : '';
+      document.getElementById('modal-task').classList.add('open');
+    }
+
+    function populateProjectOptions(selectedId = '') {
+      const select = document.getElementById('task-project');
+      select.innerHTML = projects.map((project) => `
+        <option value="${project._id}" ${project._id === selectedId ? 'selected' : ''}>${escapeHtml(project.name)}</option>
+      `).join('');
+    }
+
+    function populateAssigneeOptions(selectedId = '') {
+      const projectId = document.getElementById('task-project').value;
+      const project = projects.find((item) => item._id === projectId);
+      const members = project ? project.members : [];
+      const options = ['<option value="">Unassigned</option>'].concat(
+        members.map((member) => `<option value="${member.user._id}" ${member.user._id === selectedId ? 'selected' : ''}>${escapeHtml(member.user.name)}</option>`)
+      );
+      document.getElementById('task-assignee').innerHTML = options.join('');
+    }
+
+    function renderTasks() {
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+      const list = tasks
+        .filter((task) => statusFilter === 'all' || task.status === statusFilter)
+        .filter((task) => {
+          return task.title.toLowerCase().includes(query)
+            || (task.description || '').toLowerCase().includes(query)
+            || (task.projectName || '').toLowerCase().includes(query);
+        });
+
+      if (!list.length) {
+        document.getElementById('task-list').innerHTML = '<div class="empty">No tasks match this view yet.</div>';
+        return;
+      }
+
+      document.getElementById('task-list').innerHTML = list.map((task) => `
+        <div class="task-row" onclick="openTaskModal('${task._id}')">
+          <div>
+            <div class="task-title">${escapeHtml(task.title)}</div>
+            <div class="task-sub">${escapeHtml(task.projectName || 'Project')} - ${escapeHtml(task.assignee?.name || 'Unassigned')}</div>
+          </div>
+          <div><span class="badge ${task.status === 'done' ? 'done' : task.status === 'inprogress' ? 'progress' : 'todo'}">${taskStatusLabel(task.status)}</span></div>
+          <div class="meta-text">${escapeHtml(task.priority)}</div>
+          <div class="inline-actions">
+            <span class="helper-text">${task.dueDate ? fmtDate(task.dueDate) : 'No date'}</span>
+            <button class="btn-soft" onclick="event.stopPropagation(); quickDone('${task._id}')">Mark done</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadTasks() {
+      projects = await api('/projects') || [];
+      const taskGroups = await Promise.all(projects.map((project) => api(`/projects/${project._id}/tasks`)));
+      tasks = taskGroups.flatMap((group, index) => (group || []).map((task) => ({
+        ...task,
+        projectId: projects[index]._id,
+        projectName: projects[index].name,
+      })));
+      renderTabs();
+      renderTasks();
+    }
+
+    async function saveTask(event) {
+      event.preventDefault();
+      const id = document.getElementById('task-id').value;
+      const payload = {
+        project: document.getElementById('task-project').value,
+        assignee: document.getElementById('task-assignee').value || null,
+        title: document.getElementById('task-title').value,
+        description: document.getElementById('task-desc').value,
+        status: document.getElementById('task-status').value,
+        priority: document.getElementById('task-priority').value,
+        dueDate: document.getElementById('task-due').value || null,
+      };
+
+      const response = id
+        ? await api(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+        : await api('/tasks', { method: 'POST', body: JSON.stringify(payload) });
+
+      if (!response) return;
+      closeModal('modal-task');
+      showToast('Task saved successfully.', 'success');
+      event.target.reset();
+      loadTasks();
+    }
+
+    async function deleteTask() {
+      const id = document.getElementById('task-id').value;
+      if (!id || !window.confirm('Delete this task?')) return;
+
+      const deleted = await api(`/tasks/${id}`, { method: 'DELETE' });
+      if (!deleted) return;
+      closeModal('modal-task');
+      showToast('Task deleted.', 'success');
+      loadTasks();
+    }
+
+    async function quickDone(id) {
+      const updated = await api(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'done' }) });
+      if (updated) {
+        showToast('Task marked as done.', 'success');
+        loadTasks();
+      }
+    }
+
+    loadTasks();
+  </script>
+</body>
+</html>

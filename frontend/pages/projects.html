@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projects - SynergySphere</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>Connected workspaces for teams that ship together.</p>
+        </div>
+      </div>
+
+      <button class="new-project-btn" onclick="openCreateProject()">Create Project</button>
+
+      <nav class="nav">
+        <a class="nav-link" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>Dashboard</span></a>
+        <a class="nav-link active" href="/projects.html"><span class="nav-icon nav-projects"></span><span>Projects</span></a>
+        <a class="nav-link" href="/tasks.html"><span class="nav-icon nav-tasks"></span><span>Tasks</span></a>
+        <a class="nav-link" href="/team.html"><span class="nav-icon nav-team"></span><span>Team</span></a>
+        <a class="nav-link" href="/myday.html"><span class="nav-icon nav-myday"></span><span>My Day</span></a>
+        <a class="nav-link" href="/settings.html"><span class="nav-icon nav-settings"></span><span>Settings</span></a>
+      </nav>
+
+      <button class="sidebar-user" onclick="confirmLogout()">
+        <div id="sidebar-avatar" class="avatar-lite">U</div>
+        <div>
+          <div class="name" id="sidebar-name">User</div>
+          <div class="role" id="sidebar-role">Sign out</div>
+        </div>
+      </button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 class="page-title">Projects</h2>
+          <p class="page-subtitle">Browse every workspace, filter by progress, and jump into active delivery.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-chip" id="topbar-user"></div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="toolbar">
+          <div class="search-box">
+            <input id="search-input" placeholder="Search projects..." oninput="renderProjects()">
+          </div>
+          <div class="toolbar-actions">
+            <button class="btn-soft" onclick="setFilter('all')">Reset Filters</button>
+            <button class="action-btn" onclick="openCreateProject()">New Project</button>
+          </div>
+        </div>
+
+        <div class="tab-row" id="tab-row"></div>
+        <div class="project-grid" id="project-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal-create-project">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="section-title" style="font-size:1.6rem;">Create Project</h3>
+        <p class="panel-copy">Give the workspace a clear goal so your team knows what success looks like.</p>
+      </div>
+      <form onsubmit="createProject(event)">
+        <div class="form-grid">
+          <div class="form-row">
+            <label class="form-label" for="cp-name">Project name</label>
+            <input id="cp-name" required>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="cp-color">Accent color</label>
+            <select id="cp-color">
+              <option value="#5b57f5">Indigo</option>
+              <option value="#1c9c67">Emerald</option>
+              <option value="#cf4a61">Rose</option>
+              <option value="#0a7f8b">Teal</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:16px;">
+          <label class="form-label" for="cp-desc">Description</label>
+          <textarea id="cp-desc" placeholder="Summarize the project scope and expected outcome."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-soft" onclick="closeModal('modal-create-project')">Cancel</button>
+          <button type="submit" class="action-btn">Create Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('auth required');
+
+    const user = getUser();
+    document.getElementById('sidebar-avatar').textContent = initials(user.name);
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
+    document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
+
+    let projects = [];
+    let activeFilter = 'all';
+
+    function openCreateProject() {
+      document.getElementById('modal-create-project').classList.add('open');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    function projectStatus(project) {
+      if (project.stats.pct === 100 && project.stats.total > 0) return 'completed';
+      if (project.stats.overdue > 0) return 'atrisk';
+      return 'active';
+    }
+
+    function renderTabs() {
+      const all = projects.length;
+      const active = projects.filter((project) => projectStatus(project) === 'active').length;
+      const atrisk = projects.filter((project) => projectStatus(project) === 'atrisk').length;
+      const completed = projects.filter((project) => projectStatus(project) === 'completed').length;
+
+      document.getElementById('tab-row').innerHTML = `
+        <button class="tab-chip ${activeFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">All Projects (${all})</button>
+        <button class="tab-chip ${activeFilter === 'active' ? 'active' : ''}" onclick="setFilter('active')">Active (${active})</button>
+        <button class="tab-chip ${activeFilter === 'atrisk' ? 'active' : ''}" onclick="setFilter('atrisk')">At Risk (${atrisk})</button>
+        <button class="tab-chip ${activeFilter === 'completed' ? 'active' : ''}" onclick="setFilter('completed')">Completed (${completed})</button>
+      `;
+    }
+
+    function setFilter(next) {
+      activeFilter = next;
+      renderTabs();
+      renderProjects();
+    }
+
+    function memberStrip(project) {
+      return project.members.slice(0, 4).map((member) => avatarHtml(member.user.name, member.user.avatarColor, 'sm')).join('');
+    }
+
+    function renderProjects() {
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+      const list = projects
+        .filter((project) => activeFilter === 'all' || projectStatus(project) === activeFilter)
+        .filter((project) => {
+          return project.name.toLowerCase().includes(query) || (project.description || '').toLowerCase().includes(query);
+        });
+
+      if (!list.length) {
+        document.getElementById('project-grid').innerHTML = '<div class="empty" style="grid-column:1 / -1;">No projects match this filter yet.</div>';
+        return;
+      }
+
+      document.getElementById('project-grid').innerHTML = list.map((project) => `
+        <article class="project-card">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="project-title">${escapeHtml(project.name)}</div>
+              <div class="project-meta">${escapeHtml(project.description || 'No project description yet')}</div>
+            </div>
+            <span class="pill ${projectStatus(project) === 'completed' ? 'pill-ok' : projectStatus(project) === 'atrisk' ? 'pill-danger' : 'pill-muted'}">${projectStatus(project) === 'completed' ? 'Completed' : projectStatus(project) === 'atrisk' ? 'At Risk' : 'Active'}</span>
+          </div>
+          <div class="avatar-row">${memberStrip(project)}<span class="helper-text">${project.members.length} teammates</span></div>
+          <div class="meta-grid">
+            <div class="meta-card">
+              <div class="meta-label">Owner</div>
+              <div class="meta-value">${escapeHtml(project.owner?.name || 'Unknown')}</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Tasks</div>
+              <div class="meta-value">${project.stats.done}/${project.stats.total} complete</div>
+            </div>
+          </div>
+          <div class="mini-progress"><div style="width:${project.stats.pct}%; background:${escapeHtml(project.color || '#5b57f5')}"></div></div>
+          <div class="inline-actions">
+            <a class="btn-soft" href="/project.html?id=${project._id}">Open Workspace</a>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    async function loadProjects() {
+      projects = await api('/projects') || [];
+      renderTabs();
+      renderProjects();
+    }
+
+    async function createProject(event) {
+      event.preventDefault();
+      const created = await api('/projects', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: document.getElementById('cp-name').value,
+          description: document.getElementById('cp-desc').value,
+          color: document.getElementById('cp-color').value,
+        }),
+      });
+
+      if (!created) return;
+      closeModal('modal-create-project');
+      showToast('Project created successfully.', 'success');
+      event.target.reset();
+      loadProjects();
+    }
+
+    loadProjects();
+  </script>
+</body>
+</html>

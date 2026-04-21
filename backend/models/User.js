@@ -8,6 +8,8 @@ const userSchema = new mongoose.Schema({
   email:        { type: String, required: true, unique: true, lowercase: true },
   password:     { type: String, required: true },
   avatarColor:  { type: String, default: () => colors[Math.floor(Math.random() * colors.length)] },
+  title:        { type: String, default: 'Team Member', trim: true },
+  bio:          { type: String, default: '', trim: true, maxlength: 240 },
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {

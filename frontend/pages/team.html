@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team - SynergySphere</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>Connected workspaces for teams that ship together.</p>
+        </div>
+      </div>
+
+      <a class="new-project-btn" href="/projects.html">Manage Projects</a>
+
+      <nav class="nav">
+        <a class="nav-link" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>Dashboard</span></a>
+        <a class="nav-link" href="/projects.html"><span class="nav-icon nav-projects"></span><span>Projects</span></a>
+        <a class="nav-link" href="/tasks.html"><span class="nav-icon nav-tasks"></span><span>Tasks</span></a>
+        <a class="nav-link active" href="/team.html"><span class="nav-icon nav-team"></span><span>Team</span></a>
+        <a class="nav-link" href="/myday.html"><span class="nav-icon nav-myday"></span><span>My Day</span></a>
+        <a class="nav-link" href="/settings.html"><span class="nav-icon nav-settings"></span><span>Settings</span></a>
+      </nav>
+
+      <button class="sidebar-user" onclick="confirmLogout()">
+        <div id="sidebar-avatar" class="avatar-lite">U</div>
+        <div>
+          <div class="name" id="sidebar-name">User</div>
+          <div class="role" id="sidebar-role">Sign out</div>
+        </div>
+      </button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 class="page-title">Team</h2>
+          <p class="page-subtitle">See who is involved across projects, how loaded they are, and where help is needed.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-chip" id="topbar-user"></div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="page-section">
+          <div class="stats-grid" id="team-stats"></div>
+        </div>
+
+        <div class="page-section split-layout">
+          <div class="panel">
+            <div class="section-header">
+              <div>
+                <div class="panel-title">Team Directory</div>
+                <div class="panel-copy">Every member connected to the projects you can access.</div>
+              </div>
+            </div>
+            <div class="team-grid" id="team-grid"></div>
+          </div>
+
+          <div class="stack">
+            <div class="panel">
+              <div class="panel-title">Project Coverage</div>
+              <div class="panel-copy">Quick view of active workspaces and how many people each one has.</div>
+              <div class="list" id="project-coverage"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('auth required');
+
+    const user = getUser();
+    document.getElementById('sidebar-avatar').textContent = initials(user.name);
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
+    document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
+
+    function renderStats(members, projects) {
+      const overloaded = members.filter((member) => member.isOverloaded).length;
+      const activeTasks = members.reduce((sum, member) => sum + member.activeTasks, 0);
+
+      document.getElementById('team-stats').innerHTML = `
+        <article class="stat-card">
+          <div class="stat-icon total">TM</div>
+          <div><div class="stat-title">Team Members</div><div class="stat-value">${members.length}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon active">WK</div>
+          <div><div class="stat-title">Shared Projects</div><div class="stat-value">${projects.length}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon pending">AT</div>
+          <div><div class="stat-title">Active Assigned Tasks</div><div class="stat-value">${activeTasks}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon completed">BL</div>
+          <div><div class="stat-title">Busy Teammates</div><div class="stat-value">${overloaded}</div></div>
+        </article>
+      `;
+    }
+
+    function renderMembers(members) {
+      if (!members.length) {
+        document.getElementById('team-grid').innerHTML = '<div class="empty" style="grid-column:1 / -1;">No team data yet. Add teammates to projects first.</div>';
+        return;
+      }
+
+      document.getElementById('team-grid').innerHTML = members.map((member) => `
+        <article class="team-card">
+          <div class="avatar-row">
+            ${avatarHtml(member.user.name, member.user.avatarColor, 'lg')}
+            <div>
+              <div class="card-title">${escapeHtml(member.user.name)}</div>
+              <div class="card-copy">${escapeHtml(member.user.title || 'Team Member')}</div>
+            </div>
+          </div>
+          <p class="card-copy">${escapeHtml(member.user.bio || 'No bio added yet.')}</p>
+          <div class="meta-grid">
+            <div class="meta-card">
+              <div class="meta-label">Projects</div>
+              <div class="meta-value">${member.projectCount}</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Active Tasks</div>
+              <div class="meta-value">${member.activeTasks}</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Completed</div>
+              <div class="meta-value">${member.completedTasks}</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Overdue</div>
+              <div class="meta-value">${member.overdueTasks}</div>
+            </div>
+          </div>
+          <div class="inline-actions">
+            ${member.roles.map((role) => `<span class="pill ${role === 'owner' ? 'pill-ok' : 'pill-muted'}">${escapeHtml(role)}</span>`).join('')}
+            ${member.isOverloaded ? '<span class="pill pill-danger">Needs support</span>' : ''}
+          </div>
+          <div class="card-copy">Projects: ${member.projects.map((project) => escapeHtml(project.name)).join(', ')}</div>
+        </article>
+      `).join('');
+    }
+
+    function renderCoverage(projects) {
+      if (!projects.length) {
+        document.getElementById('project-coverage').innerHTML = '<div class="empty">No projects available.</div>';
+        return;
+      }
+
+      document.getElementById('project-coverage').innerHTML = projects.map((project) => `
+        <div class="list-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(project.name)}</div>
+              <div class="task-sub">Owner: ${escapeHtml(project.owner?.name || 'Unknown')}</div>
+            </div>
+            <span class="pill pill-muted">${project.memberCount} members</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadTeam() {
+      const data = await api('/projects/team/overview');
+      if (!data) return;
+
+      renderStats(data.members || [], data.projects || []);
+      renderMembers(data.members || []);
+      renderCoverage(data.projects || []);
+    }
+
+    loadTeam();
+  </script>
+</body>
+</html>

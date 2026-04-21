@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - SynergySphere</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>Connected workspaces for teams that ship together.</p>
+        </div>
+      </div>
+
+      <a class="new-project-btn" href="/dashboard.html">Back to Dashboard</a>
+
+      <nav class="nav">
+        <a class="nav-link" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>Dashboard</span></a>
+        <a class="nav-link" href="/projects.html"><span class="nav-icon nav-projects"></span><span>Projects</span></a>
+        <a class="nav-link" href="/tasks.html"><span class="nav-icon nav-tasks"></span><span>Tasks</span></a>
+        <a class="nav-link" href="/team.html"><span class="nav-icon nav-team"></span><span>Team</span></a>
+        <a class="nav-link" href="/myday.html"><span class="nav-icon nav-myday"></span><span>My Day</span></a>
+        <a class="nav-link active" href="/settings.html"><span class="nav-icon nav-settings"></span><span>Settings</span></a>
+      </nav>
+
+      <button class="sidebar-user" onclick="confirmLogout()">
+        <div id="sidebar-avatar" class="avatar-lite">U</div>
+        <div>
+          <div class="name" id="sidebar-name">User</div>
+          <div class="role" id="sidebar-role">Sign out</div>
+        </div>
+      </button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 class="page-title">Settings</h2>
+          <p class="page-subtitle">Update your profile, workspace identity, and password from one place.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-chip" id="topbar-user"></div>
+        </div>
+      </header>
+
+      <section class="content split-layout settings-layout">
+        <div class="panel settings-panel settings-panel-primary">
+          <div class="section-header">
+            <div>
+              <div class="panel-title">Profile</div>
+              <div class="panel-copy">These fields are stored in the database and shown across the app UI.</div>
+            </div>
+          </div>
+          <form id="settings-form" class="settings-form" onsubmit="saveProfile(event)">
+            <div class="form-grid">
+              <div class="form-row">
+                <label class="form-label" for="profile-name">Full name</label>
+                <input id="profile-name" required>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="profile-email">Email</label>
+                <input id="profile-email" type="email" required>
+              </div>
+            </div>
+            <div class="form-grid" style="margin-top:16px;">
+              <div class="form-row">
+                <label class="form-label" for="profile-title">Role title</label>
+                <input id="profile-title" placeholder="Product Lead, Engineer, Designer...">
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="profile-color">Avatar color</label>
+                <input id="profile-color" placeholder="#5b57f5">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top:16px;">
+              <label class="form-label" for="profile-bio">Short bio</label>
+              <textarea id="profile-bio" placeholder="A short sentence about how you contribute to the team."></textarea>
+            </div>
+            <div class="form-row" style="margin-top:16px;">
+              <label class="form-label" for="profile-password">New password</label>
+              <input id="profile-password" type="password" placeholder="Leave blank to keep current password">
+            </div>
+            <div class="modal-actions settings-actions" style="justify-content:flex-start;">
+              <button type="submit" class="action-btn">Save Changes</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="stack">
+          <div class="panel settings-panel">
+            <div class="panel-title">Profile Preview</div>
+            <div class="panel-copy">How your identity appears throughout SynergySphere.</div>
+            <div id="profile-preview" style="margin-top:18px;"></div>
+          </div>
+
+          <div class="panel settings-panel">
+            <div class="panel-title">Workspace Snapshot</div>
+            <div class="panel-copy">Personal context pulled from your real projects and tasks.</div>
+            <div class="list" id="workspace-snapshot" style="margin-top:18px;"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('auth required');
+
+    let currentUser = getUser();
+    document.getElementById('sidebar-avatar').textContent = initials(currentUser.name);
+    document.getElementById('sidebar-name').textContent = currentUser.name;
+    document.getElementById('sidebar-role').textContent = currentUser.title || 'Sign out';
+    document.getElementById('topbar-user').innerHTML = `${avatarHtml(currentUser.name, currentUser.avatarColor, 'sm')}<div><div class="name">${escapeHtml(currentUser.name)}</div><div class="role">${escapeHtml(currentUser.title || 'Member')}</div></div>`;
+
+    function fillForm(user) {
+      document.getElementById('profile-name').value = user.name || '';
+      document.getElementById('profile-email').value = user.email || '';
+      document.getElementById('profile-title').value = user.title || '';
+      document.getElementById('profile-color').value = user.avatarColor || '#5b57f5';
+      document.getElementById('profile-bio').value = user.bio || '';
+      document.getElementById('profile-password').value = '';
+      renderPreview(user);
+    }
+
+    function renderPreview(user) {
+      document.getElementById('profile-preview').innerHTML = `
+        <div class="team-card">
+          <div class="avatar-row">
+            ${avatarHtml(user.name, user.avatarColor, 'lg')}
+            <div>
+              <div class="card-title">${escapeHtml(user.name)}</div>
+              <div class="card-copy">${escapeHtml(user.title || 'Team Member')}</div>
+            </div>
+          </div>
+          <p class="card-copy" style="margin-top:14px;">${escapeHtml(user.bio || 'Add a short bio to help teammates know your focus.')}</p>
+          <div class="inline-actions" style="margin-top:14px;">
+            <span class="pill pill-muted">${escapeHtml(user.email)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderWorkspaceSnapshot(projects) {
+      const active = projects.filter((project) => project.stats.total > 0 && project.stats.pct < 100).length;
+      const completedTasks = projects.reduce((sum, project) => sum + project.stats.done, 0);
+      const overdue = projects.reduce((sum, project) => sum + project.stats.overdue, 0);
+
+      document.getElementById('workspace-snapshot').innerHTML = `
+        <div class="list-row"><div class="task-title">Projects you can access</div><div class="task-sub">${projects.length}</div></div>
+        <div class="list-row"><div class="task-title">Active projects</div><div class="task-sub">${active}</div></div>
+        <div class="list-row"><div class="task-title">Completed tasks in workspace</div><div class="task-sub">${completedTasks}</div></div>
+        <div class="list-row"><div class="task-title">Overdue tasks in workspace</div><div class="task-sub">${overdue}</div></div>
+      `;
+    }
+
+    async function loadSettings() {
+      const [me, projects] = await Promise.all([
+        api('/auth/me'),
+        api('/projects'),
+      ]);
+
+      if (me?.user) {
+        currentUser = me.user;
+        updateStoredUser(currentUser);
+        fillForm(currentUser);
+      }
+
+      renderWorkspaceSnapshot(projects || []);
+    }
+
+    async function saveProfile(event) {
+      event.preventDefault();
+
+      const payload = {
+        name: document.getElementById('profile-name').value,
+        email: document.getElementById('profile-email').value,
+        title: document.getElementById('profile-title').value,
+        avatarColor: document.getElementById('profile-color').value,
+        bio: document.getElementById('profile-bio').value,
+      };
+
+      const password = document.getElementById('profile-password').value.trim();
+      if (password) payload.password = password;
+
+      const response = await api('/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response?.user) return;
+
+      currentUser = response.user;
+      updateStoredUser(currentUser);
+      document.getElementById('sidebar-avatar').textContent = initials(currentUser.name);
+      document.getElementById('sidebar-name').textContent = currentUser.name;
+      document.getElementById('sidebar-role').textContent = currentUser.title || 'Sign out';
+      document.getElementById('topbar-user').innerHTML = `${avatarHtml(currentUser.name, currentUser.avatarColor, 'sm')}<div><div class="name">${escapeHtml(currentUser.name)}</div><div class="role">${escapeHtml(currentUser.title || 'Member')}</div></div>`;
+      fillForm(currentUser);
+      showToast('Profile updated successfully.', 'success');
+    }
+
+    loadSettings();
+  </script>
+</body>
+</html>

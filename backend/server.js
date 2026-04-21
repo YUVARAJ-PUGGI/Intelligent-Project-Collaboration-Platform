@@ -9,20 +9,20 @@ async function start() {
 
   try {
     await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
-    console.log('✅ MongoDB connected to:', uri);
+    console.log('[ok] MongoDB connected to:', uri);
   } catch (err) {
-    console.log('⚠️  Local MongoDB not found, starting in-memory server...');
+    console.log('[warn] Local MongoDB not found, starting in-memory server...');
     const mongod = await MongoMemoryServer.create();
     uri = mongod.getUri();
     await mongoose.connect(uri);
-    console.log('✅ In-memory MongoDB started');
+    console.log('[ok] In-memory MongoDB started');
     await seedDemoData();
   }
 
   app.listen(PORT, () => {
-    console.log(`🚀 SynergySphere → http://localhost:${PORT}`);
+    console.log(`SynergySphere -> http://localhost:${PORT}`);
     console.log('');
-    console.log('🔑 Demo logins:');
+    console.log('Demo logins:');
     console.log('   alice@demo.com / password123');
     console.log('   bob@demo.com   / password123');
     console.log('   carol@demo.com / password123');
@@ -37,14 +37,14 @@ async function seedDemoData() {
   const Activity = require('./models/Activity');
   const Notification = require('./models/Notification');
 
-  console.log('🌱 Seeding demo data...');
+  console.log('Seeding demo data...');
 
   const [alice, bob, carol, dave, eve] = await User.create([
-    { name: 'Alice Singh', email: 'alice@demo.com', password: 'password123', avatarColor: '#1a73e8' },
-    { name: 'Bob Kumar', email: 'bob@demo.com', password: 'password123', avatarColor: '#1e8e3e' },
-    { name: 'Carol Mehta', email: 'carol@demo.com', password: 'password123', avatarColor: '#e8710a' },
-    { name: 'Dave Sharma', email: 'dave@demo.com', password: 'password123', avatarColor: '#d93025' },
-    { name: 'Eve Patel', email: 'eve@demo.com', password: 'password123', avatarColor: '#9334e6' },
+    { name: 'Alice Singh', email: 'alice@demo.com', password: 'password123', avatarColor: '#1a73e8', title: 'Product Lead', bio: 'Coordinates scope, priorities, and the final demo flow.' },
+    { name: 'Bob Kumar', email: 'bob@demo.com', password: 'password123', avatarColor: '#1e8e3e', title: 'Frontend Engineer', bio: 'Owns interaction polish, auth UX, and reusable UI patterns.' },
+    { name: 'Carol Mehta', email: 'carol@demo.com', password: 'password123', avatarColor: '#e8710a', title: 'Project Analyst', bio: 'Tracks delivery health, metrics, and dashboard visibility.' },
+    { name: 'Dave Sharma', email: 'dave@demo.com', password: 'password123', avatarColor: '#d93025', title: 'Collaboration Engineer', bio: 'Builds messaging flows, team coordination, and project workspace tools.' },
+    { name: 'Eve Patel', email: 'eve@demo.com', password: 'password123', avatarColor: '#9334e6', title: 'QA Support', bio: 'Tests flows, verifies fixes, and keeps the release stable.' },
   ]);
 
   const project = await Project.create({
@@ -81,10 +81,10 @@ async function seedDemoData() {
     { user: carol._id, type: 'task_due', message: 'Task due soon: "Build project dashboard"', project: project._id, task: tasks[1]._id },
   ]);
 
-  console.log('✅ Demo data seeded!');
+  console.log('Demo data seeded.');
 }
 
 start().catch(err => {
-  console.error('❌ Startup error:', err.message);
+  console.error('Startup error:', err.message);
   process.exit(1);
 });
