@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — SynergySphere</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">⚡</div>
+        <div>
+          <div class="brand-name">SynergySphere</div>
+          <div class="brand-tagline">Team Collaboration</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Menu</div>
+        <a class="nav-item active" href="/dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+        <a class="nav-item" href="/myday.html"><span class="nav-icon">☀️</span> My Day</a>
+        <div class="nav-section-label" style="margin-top:8px;">Projects</div>
+        <div id="sidebar-projects"></div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info" onclick="handleLogout()">
+          <div id="sidebar-avatar"></div>
+          <div>
+            <div class="user-name" id="sidebar-name"></div>
+            <div class="user-email" style="color:var(--text-tertiary);">Sign out</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>Dashboard</h1>
+          <p>Overview of all your projects</p>
+        </div>
+        <div class="topbar-right" style="position:relative;">
+          <button class="notif-btn" onclick="toggleNotifPanel()">
+            🔔 <span class="notif-badge" id="notif-count" style="display:none;">0</span>
+          </button>
+          <div class="notif-panel" id="notif-panel">
+            <div class="notif-panel-header">
+              <span class="notif-panel-title">Notifications</span>
+              <button class="btn btn-sm btn-ghost" onclick="markAllRead()">Mark all read</button>
+            </div>
+            <div class="notif-list" id="notif-list"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openCreateProject()">+ New Project</button>
+        </div>
+      </header>
+
+      <div class="page-body">
+        <div class="stats-grid" id="stats-grid"></div>
+        <div class="flex items-center justify-between mb-16">
+          <h2 style="font-size:1.1rem; font-weight:500;">Your Projects</h2>
+        </div>
+        <div class="project-grid" id="project-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE PROJECT MODAL -->
+  <div class="modal-overlay" id="modal-create-project">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Create new project</h3>
+        <button class="modal-close" onclick="closeModal('modal-create-project')">✕</button>
+      </div>
+      <form onsubmit="createProject(event)">
+        <div class="form-group">
+          <label class="form-label">Project name</label>
+          <input class="form-input" id="cp-name" placeholder="e.g. E-Commerce Platform" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="cp-desc" placeholder="What's this project about?"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Theme color</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#1a73e8" checked style="display:none;"><span class="filter-chip active" data-color="#1a73e8" onclick="selectColor(this)">🔵 Blue</span></label>
+            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#1e8e3e" style="display:none;"><span class="filter-chip" data-color="#1e8e3e" onclick="selectColor(this)">🟢 Green</span></label>
+            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#9334e6" style="display:none;"><span class="filter-chip" data-color="#9334e6" onclick="selectColor(this)">🟣 Purple</span></label>
+            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#e8710a" style="display:none;"><span class="filter-chip" data-color="#e8710a" onclick="selectColor(this)">🟠 Orange</span></label>
+            <label style="cursor:pointer;"><input type="radio" name="proj-color" value="#d93025" style="display:none;"><span class="filter-chip" data-color="#d93025" onclick="selectColor(this)">🔴 Red</span></label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('modal-create-project')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw 'auth';
+    const user = getUser();
+    document.getElementById('sidebar-avatar').innerHTML = avatarHtml(user.name, user.avatarColor, 'md');
+    document.getElementById('sidebar-name').textContent = user.name;
+
+    function selectColor(el) {
+      document.querySelectorAll('[data-color]').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      el.closest('label').querySelector('input').checked = true;
+    }
+
+    async function loadDashboard() {
+      const projects = await api('/projects');
+      if (!projects) return;
+
+      let totalTasks = 0, doneTasks = 0, overdueTasks = 0, totalMembers = new Set();
+      projects.forEach(p => {
+        totalTasks += p.stats.total;
+        doneTasks += p.stats.done;
+        overdueTasks += p.stats.overdue;
+        p.members.forEach(m => totalMembers.add(m.user._id));
+      });
+      const pct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+      document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card fade-in">
+          <div class="stat-icon-wrap blue">📁</div>
+          <div><div class="stat-value">${projects.length}</div><div class="stat-label">Active Projects</div></div>
+        </div>
+        <div class="stat-card fade-in" style="animation-delay:0.05s;">
+          <div class="stat-icon-wrap yellow">📋</div>
+          <div><div class="stat-value">${totalTasks}</div><div class="stat-label">Total Tasks</div></div>
+        </div>
+        <div class="stat-card fade-in" style="animation-delay:0.1s;">
+          <div class="stat-icon-wrap green">✅</div>
+          <div>
+            <div class="stat-value">${pct}%</div><div class="stat-label">Completed</div>
+            <div class="stat-change text-success">${doneTasks} of ${totalTasks} done</div>
+          </div>
+        </div>
+        <div class="stat-card fade-in" style="animation-delay:0.15s;">
+          <div class="stat-icon-wrap red">🚨</div>
+          <div>
+            <div class="stat-value">${overdueTasks}</div><div class="stat-label">Overdue</div>
+            ${overdueTasks > 0 ? '<div class="stat-change text-danger">Needs attention</div>' : '<div class="stat-change text-success">All on track</div>'}
+          </div>
+        </div>
+      `;
+
+      if (projects.length === 0) {
+        document.getElementById('project-grid').innerHTML = `
+          <div class="empty-state" style="grid-column:1/-1;">
+            <div class="empty-icon">📂</div>
+            <div class="empty-text">No projects yet</div>
+            <div class="empty-sub">Create your first project to get started</div>
+            <button class="btn btn-primary" onclick="openCreateProject()" style="margin-top:16px;">+ New Project</button>
+          </div>`;
+        document.getElementById('sidebar-projects').innerHTML = '';
+        return;
+      }
+
+      document.getElementById('project-grid').innerHTML = projects.map((p, i) => `
+        <div class="project-card fade-in" style="--proj-color:${p.color}; animation-delay:${i*0.05}s;" onclick="window.location.href='/project.html?id=${p._id}'">
+          <div class="project-card-header">
+            <div>
+              <div class="project-name">${p.name}</div>
+              <div class="project-desc">${p.description || 'No description'}</div>
+            </div>
+            ${p.stats.overdue > 0 ? '<span class="badge badge-red">⚠ ' + p.stats.overdue + ' overdue</span>' : ''}
+          </div>
+          <div class="project-progress">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-muted">${p.stats.done}/${p.stats.total} tasks</span>
+              <span class="text-xs" style="font-weight:600;">${p.stats.pct}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${p.stats.pct}%; background:${p.color};"></div></div>
+          </div>
+          <div class="project-card-footer">
+            <div class="avatar-group">
+              ${p.members.slice(0,4).map(m => avatarHtml(m.user.name, m.user.avatarColor, 'sm')).join('')}
+              ${p.members.length > 4 ? `<div class="avatar avatar-sm" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.6rem;">+${p.members.length-4}</div>` : ''}
+            </div>
+            <span class="text-xs text-muted">${p.members.length} members</span>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('sidebar-projects').innerHTML = projects.map(p => `
+        <div class="project-nav-item" onclick="window.location.href='/project.html?id=${p._id}'">
+          <span class="project-nav-dot" style="background:${p.color}"></span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
+        </div>
+      `).join('');
+    }
+
+    async function loadNotifications() {
+      const notes = await api('/notifications');
+      if (!notes) return;
+      const unread = notes.filter(n => !n.isRead);
+      const badge = document.getElementById('notif-count');
+      if (unread.length > 0) { badge.textContent = unread.length; badge.style.display = 'flex'; }
+      else { badge.style.display = 'none'; }
+      document.getElementById('notif-list').innerHTML = notes.length === 0
+        ? '<div class="empty-state"><div class="empty-icon">🔕</div><div class="empty-text">No notifications</div></div>'
+        : notes.map(n => `<div class="notif-item ${n.isRead ? '' : 'unread'}" onclick="markRead('${n._id}',this)">
+            <div><div class="notif-msg">${n.message}</div><div class="notif-meta">${timeAgo(n.createdAt)}</div></div>
+          </div>`).join('');
+    }
+    function toggleNotifPanel() { document.getElementById('notif-panel').classList.toggle('open'); }
+    async function markRead(id, el) { await api(`/notifications/${id}/read`, { method: 'PATCH' }); if (el) el.classList.remove('unread'); loadNotifications(); }
+    async function markAllRead() { await api('/notifications/read-all', { method: 'PATCH' }); loadNotifications(); showToast('All marked as read', 'success'); }
+
+    function openCreateProject() { document.getElementById('modal-create-project').classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    async function createProject(e) {
+      e.preventDefault();
+      const checkedRadio = document.querySelector('input[name="proj-color"]:checked');
+      const data = await api('/projects', { method: 'POST', body: JSON.stringify({
+        name: document.getElementById('cp-name').value,
+        description: document.getElementById('cp-desc').value,
+        color: checkedRadio ? checkedRadio.value : '#1a73e8',
+      })});
+      if (data) { closeModal('modal-create-project'); showToast('Project created!', 'success'); loadDashboard(); }
+    }
+
+    function handleLogout() { if (confirm('Sign out?')) { clearAuth(); window.location.href = '/index.html'; } }
+
+    loadDashboard(); loadNotifications();
+    setInterval(loadNotifications, 30000);
+    document.addEventListener('click', e => {
+      const p = document.getElementById('notif-panel'), b = document.querySelector('.notif-btn');
+      if (p.classList.contains('open') && !p.contains(e.target) && !b.contains(e.target)) p.classList.remove('open');
+    });
+  </script>
+</body>
+</html>

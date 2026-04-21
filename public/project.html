@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project — SynergySphere</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">⚡</div>
+        <div><div class="brand-name">SynergySphere</div><div class="brand-tagline">Team Collaboration</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Menu</div>
+        <a class="nav-item" href="/dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+        <a class="nav-item" href="/myday.html"><span class="nav-icon">☀️</span> My Day</a>
+        <div class="nav-section-label" style="margin-top:8px;">Projects</div>
+        <div id="sidebar-projects"></div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info" onclick="handleLogout()">
+          <div id="sidebar-avatar"></div>
+          <div><div class="user-name" id="sidebar-name"></div><div class="user-email" style="color:var(--text-tertiary);">Sign out</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 id="project-title">Loading...</h1>
+          <p id="project-desc"></p>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-ghost btn-sm" onclick="openAddMember()">👥 Members</button>
+          <button class="btn btn-primary btn-sm" onclick="openCreateTask()">+ New Task</button>
+        </div>
+      </header>
+
+      <div class="page-body">
+        <!-- TABS -->
+        <div class="tabs" id="main-tabs">
+          <button class="tab-btn active" data-tab="board" onclick="switchTab('board')">📋 Task Board</button>
+          <button class="tab-btn" data-tab="discussion" onclick="switchTab('discussion')">💬 Discussion</button>
+          <button class="tab-btn" data-tab="risks" onclick="switchTab('risks')">🚨 Risks</button>
+          <button class="tab-btn" data-tab="workload" onclick="switchTab('workload')">⚖️ Workload</button>
+          <button class="tab-btn" data-tab="activity" onclick="switchTab('activity')">📜 Activity</button>
+        </div>
+
+        <!-- TAB: BOARD -->
+        <div class="tab-panel" id="panel-board">
+          <!-- SEARCH & FILTER BAR -->
+          <div class="filter-bar" id="filter-bar">
+            <div class="search-bar" style="max-width:260px;">
+              <span class="search-icon">🔍</span>
+              <input id="search-input" placeholder="Search tasks..." oninput="applyFilters()">
+            </div>
+            <div class="filter-chip" style="padding:0;">
+              <select id="filter-assignee" onchange="applyFilters()" style="padding:6px 12px;">
+                <option value="">All Members</option>
+              </select>
+            </div>
+            <div class="filter-chip" style="padding:0;">
+              <select id="filter-priority" onchange="applyFilters()" style="padding:6px 12px;">
+                <option value="">All Priorities</option>
+                <option value="high">🔴 High</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="low">🟢 Low</option>
+              </select>
+            </div>
+            <div class="filter-chip" style="padding:0;">
+              <select id="filter-due" onchange="applyFilters()" style="padding:6px 12px;">
+                <option value="">Any Due Date</option>
+                <option value="overdue">Overdue</option>
+                <option value="today">Due Today</option>
+                <option value="week">Due This Week</option>
+              </select>
+            </div>
+          </div>
+          <div class="kanban" id="kanban-board"></div>
+        </div>
+
+        <!-- TAB: DISCUSSION -->
+        <div class="tab-panel" id="panel-discussion" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">💬 Project Discussion</span>
+              <span class="text-xs text-muted" id="msg-count"></span>
+            </div>
+            <div class="chat-container">
+              <div class="chat-messages" id="chat-messages"></div>
+              <div class="chat-input-area">
+                <input class="chat-input" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()">
+                <button class="chat-send" onclick="sendMessage()">➤</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: RISKS -->
+        <div class="tab-panel" id="panel-risks" style="display:none;">
+          <div class="card"><div class="card-body" id="risks-content"></div></div>
+        </div>
+
+        <!-- TAB: WORKLOAD -->
+        <div class="tab-panel" id="panel-workload" style="display:none;">
+          <div class="card">
+            <div class="card-header"><span class="card-title">⚖️ Team Workload</span></div>
+            <div class="card-body" id="workload-content"></div>
+          </div>
+        </div>
+
+        <!-- TAB: ACTIVITY -->
+        <div class="tab-panel" id="panel-activity" style="display:none;">
+          <div class="card">
+            <div class="card-header"><span class="card-title">📜 Activity Timeline</span></div>
+            <div class="card-body" id="activity-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK MODAL -->
+  <div class="modal-overlay" id="modal-create-task">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="task-modal-title">Create task</h3>
+        <button class="modal-close" onclick="closeModal('modal-create-task')">✕</button>
+      </div>
+      <form onsubmit="saveTask(event)">
+        <input type="hidden" id="ct-id">
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input class="form-input" id="ct-title" placeholder="What needs to be done?" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="ct-desc" placeholder="Add more details..."></textarea>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Assignee</label>
+            <select class="form-select" id="ct-assignee"><option value="">Unassigned</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Priority</label>
+            <select class="form-select" id="ct-priority">
+              <option value="low">🟢 Low</option>
+              <option value="medium" selected>🟡 Medium</option>
+              <option value="high">🔴 High</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select class="form-select" id="ct-status">
+              <option value="todo">To Do</option>
+              <option value="inprogress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Due Date</label>
+            <input class="form-input" type="date" id="ct-due">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tags (comma separated)</label>
+          <input class="form-input" id="ct-tags" placeholder="e.g. frontend, urgent, bug">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger btn-sm" id="ct-delete-btn" style="display:none;margin-right:auto;" onclick="deleteTask()">Delete</button>
+          <button type="button" class="btn btn-ghost" onclick="closeModal('modal-create-task')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="ct-submit-btn">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MEMBER MODAL -->
+  <div class="modal-overlay" id="modal-add-member">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Team Members</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-member')">✕</button>
+      </div>
+      <div id="member-list" style="margin-bottom:20px;"></div>
+      <form onsubmit="addMember(event)">
+        <div class="form-group">
+          <label class="form-label">Add member by email</label>
+          <div style="display:flex;gap:8px;">
+            <input class="form-input" id="am-email" placeholder="email@example.com" type="email" required>
+            <button class="btn btn-primary" type="submit">Add</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw 'auth';
+    const user = getUser();
+    const pid = new URLSearchParams(location.search).get('id');
+    if (!pid) { window.location.href = '/dashboard.html'; throw 'no pid'; }
+
+    document.getElementById('sidebar-avatar').innerHTML = avatarHtml(user.name, user.avatarColor, 'md');
+    document.getElementById('sidebar-name').textContent = user.name;
+
+    let project = null, tasks = [], members = [];
+
+    const tagColors = ['badge-blue','badge-green','badge-yellow','badge-red','badge-purple','badge-teal','badge-gray'];
+    function tagBadge(tag, i) { return `<span class="badge task-tag ${tagColors[i % tagColors.length]}">${tag}</span>`; }
+
+    async function loadProject() {
+      project = await api(`/projects/${pid}`);
+      if (!project) { window.location.href = '/dashboard.html'; return; }
+      document.getElementById('project-title').textContent = project.name;
+      document.getElementById('project-desc').textContent = project.description || '';
+      document.title = `${project.name} — SynergySphere`;
+      members = project.members;
+      const sel = document.getElementById('ct-assignee');
+      const fSel = document.getElementById('filter-assignee');
+      sel.innerHTML = '<option value="">Unassigned</option>' + members.map(m => `<option value="${m.user._id}">${m.user.name}</option>`).join('');
+      fSel.innerHTML = '<option value="">All Members</option>' + members.map(m => `<option value="${m.user._id}">${m.user.name}</option>`).join('');
+      const projects = await api('/projects');
+      if (projects) {
+        document.getElementById('sidebar-projects').innerHTML = projects.map(p => `
+          <div class="project-nav-item ${p._id === pid ? 'active' : ''}" onclick="window.location.href='/project.html?id=${p._id}'">
+            <span class="project-nav-dot" style="background:${p.color}"></span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
+          </div>`).join('');
+      }
+    }
+
+    async function loadTasks() {
+      tasks = await api(`/projects/${pid}/tasks`) || [];
+      applyFilters();
+    }
+
+    // SEARCH & FILTER
+    function applyFilters() {
+      const q = (document.getElementById('search-input').value || '').toLowerCase();
+      const assignee = document.getElementById('filter-assignee').value;
+      const priority = document.getElementById('filter-priority').value;
+      const dueFilter = document.getElementById('filter-due').value;
+      const now = new Date();
+      const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+      const weekEnd = new Date(now.getTime() + 7 * 86400000);
+
+      const filtered = tasks.filter(t => {
+        if (q && !t.title.toLowerCase().includes(q) && !(t.description||'').toLowerCase().includes(q)) return false;
+        if (assignee && t.assignee?._id !== assignee) return false;
+        if (priority && t.priority !== priority) return false;
+        if (dueFilter === 'overdue' && !(t.dueDate && new Date(t.dueDate) < now && t.status !== 'done')) return false;
+        if (dueFilter === 'today' && !(t.dueDate && new Date(t.dueDate) <= todayEnd && new Date(t.dueDate) >= new Date(now.setHours(0,0,0,0)))) return false;
+        if (dueFilter === 'week' && !(t.dueDate && new Date(t.dueDate) <= weekEnd)) return false;
+        return true;
+      });
+      renderKanban(filtered);
+    }
+
+    function renderKanban(list) {
+      const cols = { todo: [], inprogress: [], done: [] };
+      (list || tasks).forEach(t => { if (cols[t.status]) cols[t.status].push(t); });
+      document.getElementById('kanban-board').innerHTML = ['todo','inprogress','done'].map(status => {
+        const ct = cols[status];
+        return `
+          <div class="kanban-col col-${status}" data-status="${status}"
+               ondragover="event.preventDefault(); this.classList.add('drag-over')"
+               ondragleave="this.classList.remove('drag-over')"
+               ondrop="handleDrop(event,'${status}'); this.classList.remove('drag-over')">
+            <div class="kanban-col-header">
+              <div class="col-title"><span class="col-dot"></span> ${statusLabels[status]}</div>
+              <span class="col-count">${ct.length}</span>
+            </div>
+            <div class="kanban-tasks">
+              ${ct.length === 0 ? '<div style="text-align:center;padding:28px;color:var(--text-disabled);font-size:0.8rem;">No tasks</div>' :
+                ct.map(t => taskCardHtml(t)).join('')}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function taskCardHtml(t) {
+      const dc = t.status !== 'done' && t.dueDate ? (isOverdue(t.dueDate) ? 'overdue' : isDueSoon(t.dueDate) ? 'soon' : '') : '';
+      const tagsHtml = (t.tags && t.tags.length) ? `<div class="task-tags">${t.tags.map((tg,i) => tagBadge(tg,i)).join('')}</div>` : '';
+      return `
+        <div class="task-card p-${t.priority}" draggable="true"
+             ondragstart="event.dataTransfer.setData('text/plain','${t._id}'); this.classList.add('dragging')"
+             ondragend="this.classList.remove('dragging')"
+             onclick="openEditTask('${t._id}')">
+          <div class="task-title">${t.title}</div>
+          <div class="task-meta">
+            <span class="priority-dot ${t.priority}"></span>
+            <span class="badge ${statusBadge[t.status]}">${prioLabels[t.priority]}</span>
+            ${t.dueDate ? `<span class="task-due ${dc}">📅 ${fmtDate(t.dueDate)}</span>` : ''}
+          </div>
+          ${tagsHtml}
+          <div class="task-footer">
+            ${t.assignee ? avatarHtml(t.assignee.name, t.assignee.avatarColor, 'sm') : '<span class="text-xs text-muted">Unassigned</span>'}
+            <div class="task-actions">
+              <button class="task-action-btn" onclick="event.stopPropagation(); openEditTask('${t._id}')" title="Edit">✏️</button>
+              <button class="task-action-btn" onclick="event.stopPropagation(); quickDelete('${t._id}')" title="Delete">🗑</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    async function handleDrop(e, newStatus) {
+      e.preventDefault();
+      const taskId = e.dataTransfer.getData('text/plain');
+      await api(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+      loadTasks();
+    }
+    async function quickDelete(id) {
+      if (!confirm('Delete this task?')) return;
+      await api(`/tasks/${id}`, { method: 'DELETE' });
+      showToast('Task deleted', 'success'); loadTasks();
+    }
+
+    // TASK MODAL
+    function openCreateTask() {
+      document.getElementById('task-modal-title').textContent = 'Create task';
+      document.getElementById('ct-submit-btn').textContent = 'Create';
+      document.getElementById('ct-delete-btn').style.display = 'none';
+      document.getElementById('ct-id').value = '';
+      document.getElementById('ct-title').value = '';
+      document.getElementById('ct-desc').value = '';
+      document.getElementById('ct-assignee').value = '';
+      document.getElementById('ct-priority').value = 'medium';
+      document.getElementById('ct-status').value = 'todo';
+      document.getElementById('ct-due').value = '';
+      document.getElementById('ct-tags').value = '';
+      document.getElementById('modal-create-task').classList.add('open');
+    }
+    function openEditTask(id) {
+      const t = tasks.find(x => x._id === id);
+      if (!t) return;
+      document.getElementById('task-modal-title').textContent = 'Edit task';
+      document.getElementById('ct-submit-btn').textContent = 'Save';
+      document.getElementById('ct-delete-btn').style.display = 'inline-flex';
+      document.getElementById('ct-id').value = t._id;
+      document.getElementById('ct-title').value = t.title;
+      document.getElementById('ct-desc').value = t.description || '';
+      document.getElementById('ct-assignee').value = t.assignee?._id || '';
+      document.getElementById('ct-priority').value = t.priority;
+      document.getElementById('ct-status').value = t.status;
+      document.getElementById('ct-due').value = t.dueDate ? t.dueDate.substring(0,10) : '';
+      document.getElementById('ct-tags').value = (t.tags || []).join(', ');
+      document.getElementById('modal-create-task').classList.add('open');
+    }
+    async function saveTask(e) {
+      e.preventDefault();
+      const id = document.getElementById('ct-id').value;
+      const tagsRaw = document.getElementById('ct-tags').value;
+      const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+      const body = {
+        project: pid,
+        title: document.getElementById('ct-title').value,
+        description: document.getElementById('ct-desc').value,
+        assignee: document.getElementById('ct-assignee').value || null,
+        priority: document.getElementById('ct-priority').value,
+        status: document.getElementById('ct-status').value,
+        dueDate: document.getElementById('ct-due').value || null,
+        tags,
+      };
+      if (id) {
+        await api(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+        showToast('Task updated', 'success');
+      } else {
+        await api('/tasks', { method: 'POST', body: JSON.stringify(body) });
+        showToast('Task created', 'success');
+      }
+      closeModal('modal-create-task'); loadTasks();
+    }
+    async function deleteTask() {
+      const id = document.getElementById('ct-id').value;
+      if (!id || !confirm('Delete this task?')) return;
+      await api(`/tasks/${id}`, { method: 'DELETE' });
+      closeModal('modal-create-task'); showToast('Task deleted', 'success'); loadTasks();
+    }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    // TABS
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+      document.getElementById(`panel-${tab}`).style.display = 'block';
+      if (tab === 'discussion') loadMessages();
+      if (tab === 'risks') loadRisks();
+      if (tab === 'workload') loadWorkload();
+      if (tab === 'activity') loadActivity();
+    }
+
+    // DISCUSSION
+    async function loadMessages() {
+      const msgs = await api(`/projects/${pid}/messages`) || [];
+      document.getElementById('msg-count').textContent = `${msgs.length} messages`;
+      const el = document.getElementById('chat-messages');
+      if (msgs.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-text">Start the conversation</div></div>'; return; }
+      el.innerHTML = msgs.map(m => {
+        const mine = m.sender._id === user.id;
+        return `<div class="chat-msg ${mine ? 'mine' : ''}">
+          ${!mine ? avatarHtml(m.sender.name, m.sender.avatarColor, 'sm') : ''}
+          <div><div class="chat-bubble ${mine ? 'mine' : ''}">
+            ${!mine ? `<div class="chat-name">${m.sender.name}</div>` : ''}
+            <div class="chat-text">${m.content}</div>
+            <div class="chat-time">${timeAgo(m.createdAt)}</div>
+            ${m.convertedToTask ? '<div class="chat-converted">✓ Converted to task</div>'
+              : `<button class="convert-btn" onclick="convertToTask('${m._id}')">📋 Convert to task</button>`}
+          </div></div>
+          ${mine ? avatarHtml(m.sender.name, m.sender.avatarColor, 'sm') : ''}
+        </div>`;
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+    async function sendMessage() {
+      const inp = document.getElementById('chat-input'); const c = inp.value.trim(); if (!c) return;
+      inp.value = '';
+      await api('/messages', { method: 'POST', body: JSON.stringify({ project: pid, content: c }) });
+      loadMessages();
+    }
+    async function convertToTask(msgId) {
+      const t = await api(`/messages/${msgId}/convert`, { method: 'POST' });
+      if (t) { showToast('Converted to task!', 'success'); loadMessages(); loadTasks(); }
+    }
+
+    // RISKS
+    async function loadRisks() {
+      const r = await api(`/projects/${pid}/risks`); if (!r) return;
+      const total = r.overdue.length + r.dueSoon.length + r.stale.length;
+      if (total === 0) { document.getElementById('risks-content').innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">No risks detected</div><div class="empty-sub">All tasks on track</div></div>'; return; }
+      let h = '';
+      if (r.overdue.length) h += `<div class="risk-section"><div class="risk-section-title">🔴 Overdue (${r.overdue.length})</div>${r.overdue.map(t => `<div class="risk-item risk-overdue"><span class="risk-icon">⚠️</span><div class="risk-info"><div class="risk-title">${t.title}</div><div class="risk-subtitle">Due ${fmtDate(t.dueDate)} · ${t.assignee?.name||'Unassigned'}</div></div><span class="badge badge-red">Overdue</span></div>`).join('')}</div>`;
+      if (r.dueSoon.length) h += `<div class="risk-section"><div class="risk-section-title">🟡 Due in 24h (${r.dueSoon.length})</div>${r.dueSoon.map(t => `<div class="risk-item risk-soon"><span class="risk-icon">⏰</span><div class="risk-info"><div class="risk-title">${t.title}</div><div class="risk-subtitle">Due ${fmtDate(t.dueDate)} · ${t.assignee?.name||'Unassigned'}</div></div><span class="badge badge-yellow">Due Soon</span></div>`).join('')}</div>`;
+      if (r.stale.length) h += `<div class="risk-section"><div class="risk-section-title">🟣 Stale (${r.stale.length})</div>${r.stale.map(t => `<div class="risk-item risk-stale"><span class="risk-icon">💤</span><div class="risk-info"><div class="risk-title">${t.title}</div><div class="risk-subtitle">${t.assignee?.name||'Unassigned'} · No activity 2+ days</div></div><span class="badge badge-purple">Stale</span></div>`).join('')}</div>`;
+      document.getElementById('risks-content').innerHTML = h;
+    }
+
+    // WORKLOAD
+    async function loadWorkload() {
+      const d = await api(`/projects/${pid}/workload`) || [];
+      if (!d.length) { document.getElementById('workload-content').innerHTML = '<div class="empty-state"><div class="empty-text">No members</div></div>'; return; }
+      const mx = Math.max(...d.map(x => x.total), 1);
+      document.getElementById('workload-content').innerHTML = d.map(x => `
+        <div class="workload-item">
+          ${avatarHtml(x.user.name, x.user.avatarColor, 'md')}
+          <div class="workload-info">
+            <div class="workload-name">${x.user.name} ${x.isOverloaded ? '<span class="overload-badge">OVERLOADED</span>' : ''} <span class="badge ${x.role==='owner'?'badge-blue':'badge-purple'}" style="font-size:0.6rem;">${x.role}</span></div>
+            <div class="workload-stats">${x.active} active · ${x.done} done · ${x.total} total</div>
+          </div>
+          <div class="workload-bar-wrap"><div class="workload-bar"><div class="workload-fill ${x.isOverloaded?'overloaded':''}" style="width:${(x.total/mx)*100}%"></div></div></div>
+        </div>`).join('');
+    }
+
+    // ACTIVITY
+    async function loadActivity() {
+      const d = await api(`/projects/${pid}/activity`) || [];
+      if (!d.length) { document.getElementById('activity-content').innerHTML = '<div class="empty-state"><div class="empty-icon">📜</div><div class="empty-text">No activity yet</div></div>'; return; }
+      const icons = { 'created project':'🚀','created task':'📋','completed':'✅','updated':'✏️','deleted':'🗑','added member':'👤','converted':'💬','moved':'📦' };
+      document.getElementById('activity-content').innerHTML = `<div class="timeline">${d.map(a => `
+        <div class="timeline-item">
+          <div class="timeline-dot">${Object.entries(icons).find(([k])=>a.action.includes(k))?.[1]||'📌'}</div>
+          <div class="timeline-body">
+            <div class="timeline-action"><strong>${a.user?.name||'Someone'}</strong> ${a.action}${a.details?`: "${a.details}"`:''}
+            </div><div class="timeline-time">${timeAgo(a.createdAt)}</div>
+          </div>
+        </div>`).join('')}</div>`;
+    }
+
+    // MEMBERS
+    function openAddMember() { renderMemberList(); document.getElementById('modal-add-member').classList.add('open'); }
+    function renderMemberList() {
+      document.getElementById('member-list').innerHTML = `<table class="member-table"><thead><tr><th>Member</th><th>Role</th><th></th></tr></thead><tbody>
+        ${members.map(m => `<tr><td><div class="flex items-center gap-8">${avatarHtml(m.user.name,m.user.avatarColor,'sm')}<span>${m.user.name}</span></div></td>
+        <td><span class="badge ${m.role==='owner'?'badge-blue':'badge-purple'}">${m.role}</span></td>
+        <td>${m.role!=='owner'&&project.owner._id===user.id?`<button class="btn btn-danger btn-sm" onclick="removeMember('${m.user._id}')">Remove</button>`:''}</td></tr>`).join('')}
+      </tbody></table>`;
+    }
+    async function addMember(e) {
+      e.preventDefault();
+      const up = await api(`/projects/${pid}/members`, { method: 'POST', body: JSON.stringify({ email: document.getElementById('am-email').value }) });
+      if (up) { project = up; members = up.members; document.getElementById('am-email').value = ''; renderMemberList();
+        document.getElementById('ct-assignee').innerHTML = '<option value="">Unassigned</option>' + members.map(m=>`<option value="${m.user._id}">${m.user.name}</option>`).join('');
+        document.getElementById('filter-assignee').innerHTML = '<option value="">All Members</option>' + members.map(m=>`<option value="${m.user._id}">${m.user.name}</option>`).join('');
+        showToast('Member added!', 'success'); }
+    }
+    async function removeMember(uid) {
+      if (!confirm('Remove?')) return;
+      const up = await api(`/projects/${pid}/members/${uid}`, { method: 'DELETE' });
+      if (up) { project = up; members = up.members; renderMemberList(); showToast('Removed', 'success'); }
+    }
+
+    function handleLogout() { if (confirm('Sign out?')) { clearAuth(); window.location.href = '/index.html'; } }
+
+    (async () => { await loadProject(); await loadTasks(); })();
+  </script>
+</body>
+</html>

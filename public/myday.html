@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Day — SynergySphere</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">⚡</div>
+        <div><div class="brand-name">SynergySphere</div><div class="brand-tagline">Team Collaboration</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Menu</div>
+        <a class="nav-item" href="/dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+        <a class="nav-item active" href="/myday.html"><span class="nav-icon">☀️</span> My Day</a>
+        <div class="nav-section-label" style="margin-top:8px;">Projects</div>
+        <div id="sidebar-projects"></div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info" onclick="handleLogout()">
+          <div id="sidebar-avatar"></div>
+          <div><div class="user-name" id="sidebar-name"></div><div class="user-email" style="color:var(--text-tertiary);">Sign out</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>☀️ My Day</h1>
+          <p>Your focused daily view</p>
+        </div>
+      </header>
+
+      <div class="page-body">
+        <div class="myday-header fade-in">
+          <div class="myday-greeting">Good <span id="greeting-time">morning</span>, <span id="greeting-name">there</span>!</div>
+          <div class="myday-date" id="today-date"></div>
+        </div>
+        <div class="myday-section fade-in" id="section-overdue" style="animation-delay:0.05s;"></div>
+        <div class="myday-section fade-in" id="section-today" style="animation-delay:0.1s;"></div>
+        <div class="myday-section fade-in" id="section-due-soon" style="animation-delay:0.15s;"></div>
+        <div class="myday-section fade-in" id="section-all-active" style="animation-delay:0.2s;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw 'auth';
+    const user = getUser();
+    document.getElementById('sidebar-avatar').innerHTML = avatarHtml(user.name, user.avatarColor, 'md');
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('greeting-name').textContent = user.name.split(' ')[0];
+    const hour = new Date().getHours();
+    document.getElementById('greeting-time').textContent = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+    function taskItem(t) {
+      return `<div class="myday-task-item">
+        <div class="myday-task-check ${t.status==='done'?'done':''}" onclick="markDone('${t._id}',this)">${t.status==='done'?'✓':''}</div>
+        <div class="myday-task-info">
+          <div class="myday-task-title">${t.title}</div>
+          <div class="myday-task-sub">
+            <span class="priority-dot ${t.priority}"></span> ${prioLabels[t.priority]}
+            ${t.project ? ` · ${t.project.name}` : ''}
+            ${t.dueDate ? ` · 📅 ${fmtDate(t.dueDate)}` : ''}
+          </div>
+        </div>
+        <span class="badge ${statusBadge[t.status]}">${statusLabels[t.status]}</span>
+      </div>`;
+    }
+
+    async function loadMyDay() {
+      const data = await api('/myday');
+      if (!data) return;
+
+      const ov = document.getElementById('section-overdue');
+      ov.innerHTML = data.overdue.length > 0
+        ? `<div class="section-title"><span style="color:var(--red);">🔴</span> Overdue (${data.overdue.length})</div>${data.overdue.map(taskItem).join('')}` : '';
+
+      const td = document.getElementById('section-today');
+      td.innerHTML = data.todayTasks.length > 0
+        ? `<div class="section-title">📅 Due Today (${data.todayTasks.length})</div>${data.todayTasks.map(taskItem).join('')}`
+        : `<div class="section-title">📅 Due Today</div><div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-text">Nothing due today</div><div class="empty-sub">Enjoy your day or pick up tasks from the backlog</div></div>`;
+
+      const ds = document.getElementById('section-due-soon');
+      ds.innerHTML = data.dueSoon.length > 0
+        ? `<div class="section-title">⏳ Coming Up (${data.dueSoon.length})</div>${data.dueSoon.map(taskItem).join('')}` : '';
+
+      // Also fetch all active tasks assigned to user across all projects
+      const projects = await api('/projects');
+      if (projects) {
+        let allActive = [];
+        for (const p of projects) {
+          const tasks = await api(`/projects/${p._id}/tasks`);
+          if (tasks) {
+            const mine = tasks.filter(t => t.assignee?._id === user.id && t.status !== 'done');
+            mine.forEach(t => { t.project = { name: p.name, color: p.color }; });
+            allActive.push(...mine);
+          }
+        }
+        const section = document.getElementById('section-all-active');
+        if (allActive.length > 0) {
+          section.innerHTML = `<div class="section-title">📋 All My Active Tasks (${allActive.length})</div>${allActive.map(taskItem).join('')}`;
+        } else {
+          section.innerHTML = '';
+        }
+        document.getElementById('sidebar-projects').innerHTML = projects.map(p => `
+          <div class="project-nav-item" onclick="window.location.href='/project.html?id=${p._id}'">
+            <span class="project-nav-dot" style="background:${p.color}"></span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
+          </div>`).join('');
+      }
+    }
+
+    async function markDone(taskId, el) {
+      await api(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status: 'done' }) });
+      el.classList.add('done'); el.innerHTML = '✓';
+      showToast('Task completed!', 'success');
+      setTimeout(loadMyDay, 500);
+    }
+
+    function handleLogout() { if (confirm('Sign out?')) { clearAuth(); window.location.href = '/index.html'; } }
+    loadMyDay();
+  </script>
+</body>
+</html>
