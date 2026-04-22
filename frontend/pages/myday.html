@@ -83,6 +83,7 @@
           <div>
             <div class="task-title">${escapeHtml(task.title)}</div>
             <div class="task-sub">${escapeHtml(task.project?.name || 'Project')} - ${task.dueDate ? fmtDate(task.dueDate) : 'No due date'}</div>
+            <div class="message-meta" style="margin-top:6px; max-width:760px;">Purpose: ${escapeHtml(task.description || task.project?.description || 'No purpose added for this task yet.')}</div>
           </div>
           <div><span class="pill ${task.tone}">${task.label}</span></div>
           <div class="meta-text">${escapeHtml(task.priority)}</div>

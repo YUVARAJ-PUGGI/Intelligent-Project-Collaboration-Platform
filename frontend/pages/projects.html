@@ -104,10 +104,18 @@
     if (!requireAuth()) throw new Error('auth required');
 
     const user = getUser();
+    const isManager = canManageWorkspace();
     document.getElementById('sidebar-avatar').textContent = initials(user.name);
     document.getElementById('sidebar-name').textContent = user.name;
     document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
     document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
+
+    document.querySelector('.new-project-btn').classList.toggle('hidden', !isManager);
+    document.querySelectorAll('.action-btn').forEach((button) => {
+      if (button.textContent.includes('New Project')) {
+        button.classList.toggle('hidden', !isManager);
+      }
+    });
 
     let projects = [];
     let activeFilter = 'all';
@@ -199,6 +207,11 @@
 
     async function createProject(event) {
       event.preventDefault();
+      if (!isManager) {
+        showToast('Only managers can create projects.', 'error');
+        return;
+      }
+
       const created = await api('/projects', {
         method: 'POST',
         body: JSON.stringify({

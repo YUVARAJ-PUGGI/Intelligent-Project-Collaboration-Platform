@@ -2,7 +2,14 @@ const Project = require('../models/Project');
 const Task = require('../models/Task');
 const Notification = require('../models/Notification');
 const Activity = require('../models/Activity');
-const { buildTaskPayload, getTaskUpdateAction, shouldNotifyAssignee } = require('../services/taskService');
+const { findIdentityById } = require('../services/identityService');
+const {
+  buildTaskPayload,
+  getTaskUpdateAction,
+  shouldNotifyAssignee,
+  normalizePriority,
+  normalizeStatus,
+} = require('../services/taskService');
 
 async function canAccessProject(projectId, userId) {
   return Project.exists({ _id: projectId, 'members.user': userId });
@@ -18,12 +25,33 @@ async function loadAccessibleTask(taskId, userId) {
   return task;
 }
 
+async function validateDeveloperAssignee(projectId, assigneeId) {
+  if (!assigneeId) return null;
+
+  const isMember = await Project.exists({ _id: projectId, 'members.user': assigneeId });
+  if (!isMember) {
+    return 'Assignee must be a member of the selected project';
+  }
+
+  const assignee = await findIdentityById(assigneeId);
+  if (!assignee || assignee.role !== 'developer') {
+    return 'Tasks can only be assigned to developers';
+  }
+
+  return null;
+}
+
 async function createTask(req, res) {
   try {
     const payload = buildTaskPayload(req.body, req.user._id);
     const hasAccess = await canAccessProject(payload.project, req.user._id);
     if (!hasAccess) {
       return res.status(403).json({ message: 'You cannot create tasks in that project' });
+    }
+
+    const assigneeError = await validateDeveloperAssignee(payload.project, payload.assignee);
+    if (assigneeError) {
+      return res.status(400).json({ message: assigneeError });
     }
 
     const task = await Task.create(payload);
@@ -67,22 +95,51 @@ async function updateTask(req, res) {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    if (req.body.project && req.body.project.toString() !== task.project.toString()) {
-      const hasTargetAccess = await canAccessProject(req.body.project, req.user._id);
+    const updates = { ...req.body };
+
+    if (req.user.role === 'developer') {
+      if (!task.assignee || task.assignee.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'Developers can only update tasks assigned to them' });
+      }
+
+      const disallowedField = ['project', 'assignee', 'priority', 'dueDate', 'title', 'description']
+        .find((field) => typeof updates[field] !== 'undefined');
+      if (disallowedField) {
+        return res.status(403).json({ message: 'Developers can only update task status' });
+      }
+    }
+
+    if (updates.project && updates.project.toString() !== task.project.toString()) {
+      const hasTargetAccess = await canAccessProject(updates.project, req.user._id);
       if (!hasTargetAccess) {
         return res.status(403).json({ message: 'You cannot move tasks to that project' });
       }
     }
 
+    if (typeof updates.assignee !== 'undefined') {
+      const targetProjectId = updates.project || task.project;
+      const assigneeError = await validateDeveloperAssignee(targetProjectId, updates.assignee);
+      if (assigneeError) {
+        return res.status(400).json({ message: assigneeError });
+      }
+    }
+
+    if (typeof updates.status !== 'undefined') {
+      updates.status = normalizeStatus(updates.status);
+    }
+    if (typeof updates.priority !== 'undefined') {
+      updates.priority = normalizePriority(updates.priority);
+    }
+
     const previousAssignee = task.assignee?.toString();
     const previousStatus = task.status;
 
-    Object.assign(task, req.body);
+    Object.assign(task, updates);
     await task.save();
 
-    if (shouldNotifyAssignee(req.body.assignee, previousAssignee, req.user._id.toString())) {
+    if (shouldNotifyAssignee(updates.assignee, previousAssignee, req.user._id.toString())) {
       await Notification.create({
-        user: req.body.assignee,
+        user: updates.assignee,
         type: 'task_assigned',
         message: `You were assigned: "${task.title}"`,
         project: task.project,
@@ -93,7 +150,7 @@ async function updateTask(req, res) {
     await Activity.create({
       project: task.project,
       user: req.user._id,
-      action: getTaskUpdateAction(previousStatus, req.body.status),
+      action: getTaskUpdateAction(previousStatus, updates.status),
       entityType: 'task',
       entityId: task._id,
       details: task.title,

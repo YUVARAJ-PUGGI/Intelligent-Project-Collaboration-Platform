@@ -59,6 +59,18 @@
           </div>
         </div>
 
+        <div class="panel hidden" id="task-monitor-panel" style="margin-bottom:20px;">
+          <div class="section-header">
+            <div>
+              <div class="panel-title">Task Progress Monitor</div>
+              <div class="panel-copy">See how assigned work is moving without leaving the task page.</div>
+            </div>
+            <a class="btn-soft" href="/dashboard.html">Open Dashboard</a>
+          </div>
+          <div class="stats-grid" id="task-monitor-stats" style="margin-bottom:16px;"></div>
+          <div class="list" id="task-monitor-list"></div>
+        </div>
+
         <div class="tab-row" id="tab-row"></div>
         <div class="list" id="task-list"></div>
       </section>
@@ -127,14 +139,23 @@
     if (!requireAuth()) throw new Error('auth required');
 
     const user = getUser();
+    const isManager = canManageWorkspace();
     document.getElementById('sidebar-avatar').textContent = initials(user.name);
     document.getElementById('sidebar-name').textContent = user.name;
     document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
     document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
 
+    document.querySelector('.new-project-btn').classList.toggle('hidden', !isManager);
+    document.querySelectorAll('.action-btn').forEach((button) => {
+      if (button.textContent.includes('New Task')) {
+        button.classList.toggle('hidden', !isManager);
+      }
+    });
+
     let projects = [];
     let tasks = [];
     let statusFilter = 'all';
+    let taskMonitor = { tasks: [], summary: { total: 0, done: 0, active: 0, overdue: 0, stale: 0 } };
 
     function taskStatusLabel(status) {
       if (status === 'inprogress') return 'In Progress';
@@ -173,9 +194,24 @@
       }
 
       const task = id ? tasks.find((item) => item._id === id) : null;
+      if (!isManager && !task) {
+        showToast('Only managers can create tasks.', 'error');
+        return;
+      }
+
+      if (isManager && !task) {
+        const hasAnyDeveloper = projects.some((project) =>
+          project.members.some((member) => member.user?.role === 'developer')
+        );
+        if (!hasAnyDeveloper) {
+          showToast('No developers are available in your projects yet.', 'error');
+          return;
+        }
+      }
+
       document.getElementById('task-id').value = task?._id || '';
       document.getElementById('task-modal-title').textContent = task ? 'Edit Task' : 'Create Task';
-      document.getElementById('delete-task-btn').classList.toggle('hidden', !task);
+      document.getElementById('delete-task-btn').classList.toggle('hidden', !task || !isManager);
 
       populateProjectOptions(task?.project || task?.projectId);
       populateAssigneeOptions(task?.assignee?._id || task?.assignee || '');
@@ -185,6 +221,11 @@
       document.getElementById('task-status').value = task?.status || 'todo';
       document.getElementById('task-priority').value = task?.priority || 'medium';
       document.getElementById('task-due').value = task?.dueDate ? task.dueDate.substring(0, 10) : '';
+
+      ['task-project', 'task-assignee', 'task-title', 'task-desc', 'task-priority', 'task-due'].forEach((idAttr) => {
+        document.getElementById(idAttr).disabled = !isManager;
+      });
+
       document.getElementById('modal-task').classList.add('open');
     }
 
@@ -198,11 +239,30 @@
     function populateAssigneeOptions(selectedId = '') {
       const projectId = document.getElementById('task-project').value;
       const project = projects.find((item) => item._id === projectId);
-      const members = project ? project.members : [];
+      const members = project ? project.members.filter((member) => member.user?.role === 'developer') : [];
       const options = ['<option value="">Unassigned</option>'].concat(
         members.map((member) => `<option value="${member.user._id}" ${member.user._id === selectedId ? 'selected' : ''}>${escapeHtml(member.user.name)}</option>`)
       );
       document.getElementById('task-assignee').innerHTML = options.join('');
+    }
+
+    function formatAssignmentWarning(check) {
+      const extensionText = check.suggestedExtensionHours
+        ? `Suggested extension: ${check.suggestedExtensionHours} hours.`
+        : 'Suggested extension: 2 hours.';
+      const alternativeText = check.alternative
+        ? `Alternative: ${check.alternative.name} (${check.alternative.activeTasks} active, ${check.alternative.urgentTasks} due in 12h).`
+        : 'Alternative: No lower-load developer available right now.';
+
+      return [
+        check.suggestion,
+        '',
+        `Current load: ${check.metrics.activeTasks} active task(s), ${check.metrics.highPriorityDueSoon} high-priority due in next 12h.`,
+        extensionText,
+        alternativeText,
+        '',
+        'Proceed anyway?',
+      ].join('\n');
     }
 
     function renderTasks() {
@@ -236,6 +296,59 @@
       `).join('');
     }
 
+    function renderTaskMonitor(data) {
+      if (!isManager) return;
+
+      const summary = data?.summary || { total: 0, done: 0, active: 0, overdue: 0, stale: 0 };
+      const items = data?.tasks || [];
+
+      document.getElementById('task-monitor-panel').classList.remove('hidden');
+      document.getElementById('task-monitor-stats').innerHTML = `
+        <article class="stat-card">
+          <div class="stat-icon total">TK</div>
+          <div><div class="stat-title">Tracked</div><div class="stat-value">${summary.total}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon active">AC</div>
+          <div><div class="stat-title">Active</div><div class="stat-value">${summary.active}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon pending">OV</div>
+          <div><div class="stat-title">Overdue</div><div class="stat-value">${summary.overdue}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon completed">ST</div>
+          <div><div class="stat-title">Stale</div><div class="stat-value">${summary.stale}</div></div>
+        </article>
+      `;
+
+      if (!items.length) {
+        document.getElementById('task-monitor-list').innerHTML = '<div class="empty">No task progress to monitor yet.</div>';
+        return;
+      }
+
+      document.getElementById('task-monitor-list').innerHTML = items.slice(0, 8).map((task) => `
+        <div class="list-row">
+          <div class="section-header" style="margin-bottom:0; align-items:flex-start;">
+            <div>
+              <div class="task-title">${escapeHtml(task.title)}</div>
+              <div class="task-sub">${escapeHtml(task.project?.name || 'Project')} - ${escapeHtml(task.assignee?.name || 'Unassigned')}</div>
+              <div class="message-meta" style="margin-top:6px; max-width:760px;">${escapeHtml(task.description || task.project?.description || 'No task purpose added yet.')}</div>
+              <div class="message-meta" style="margin-top:6px;">Last update: ${timeAgo(task.updatedAt)}</div>
+            </div>
+            <span class="pill ${task.position === 'overdue' || task.position === 'stale' ? 'pill-danger' : task.position === 'done' ? 'pill-ok' : 'pill-muted'}">${escapeHtml(task.position)}</span>
+          </div>
+          <div class="inline-actions" style="margin-top:10px;">
+            <span class="pill ${task.priority === 'high' ? 'pill-danger' : task.priority === 'medium' ? 'pill-muted' : 'pill-ok'}">${escapeHtml(task.priority)}</span>
+            ${task.dueDate ? `<span class="pill pill-muted">Due ${fmtDate(task.dueDate)}</span>` : '<span class="pill pill-muted">No due date</span>'}
+            ${task.overdue ? '<span class="pill pill-danger">Overdue</span>' : ''}
+            ${task.dueSoon ? '<span class="pill pill-ok">Due soon</span>' : ''}
+            ${task.stale ? '<span class="pill pill-danger">Needs update</span>' : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
     async function loadTasks() {
       projects = await api('/projects') || [];
       const taskGroups = await Promise.all(projects.map((project) => api(`/projects/${project._id}/tasks`)));
@@ -244,6 +357,10 @@
         projectId: projects[index]._id,
         projectName: projects[index].name,
       })));
+      if (isManager) {
+        taskMonitor = await api('/projects/manager/task-monitor') || taskMonitor;
+        renderTaskMonitor(taskMonitor);
+      }
       renderTabs();
       renderTasks();
     }
@@ -251,15 +368,35 @@
     async function saveTask(event) {
       event.preventDefault();
       const id = document.getElementById('task-id').value;
-      const payload = {
-        project: document.getElementById('task-project').value,
-        assignee: document.getElementById('task-assignee').value || null,
-        title: document.getElementById('task-title').value,
-        description: document.getElementById('task-desc').value,
-        status: document.getElementById('task-status').value,
-        priority: document.getElementById('task-priority').value,
-        dueDate: document.getElementById('task-due').value || null,
-      };
+      const payload = isManager
+        ? {
+            project: document.getElementById('task-project').value,
+            assignee: document.getElementById('task-assignee').value || null,
+            title: document.getElementById('task-title').value,
+            description: document.getElementById('task-desc').value,
+            status: document.getElementById('task-status').value,
+            priority: document.getElementById('task-priority').value,
+            dueDate: document.getElementById('task-due').value || null,
+          }
+        : {
+            status: document.getElementById('task-status').value,
+          };
+
+      if (isManager && payload.assignee) {
+        const check = await api(`/projects/${payload.project}/assignment-check`, {
+          method: 'POST',
+          body: JSON.stringify({
+            assigneeId: payload.assignee,
+            dueDate: payload.dueDate,
+            priority: payload.priority,
+          }),
+        });
+
+        if (check && check.isOverloaded) {
+          const proceed = window.confirm(formatAssignmentWarning(check));
+          if (!proceed) return;
+        }
+      }
 
       const response = id
         ? await api(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
@@ -273,6 +410,11 @@
     }
 
     async function deleteTask() {
+      if (!isManager) {
+        showToast('Only managers can delete tasks.', 'error');
+        return;
+      }
+
       const id = document.getElementById('task-id').value;
       if (!id || !window.confirm('Delete this task?')) return;
 

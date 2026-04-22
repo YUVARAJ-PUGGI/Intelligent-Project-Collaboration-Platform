@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Workspace - SynergySphere</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>Connected workspaces for teams that ship together.</p>
+        </div>
+      </div>
+
+      <a class="new-project-btn" href="/myday.html">Open My Day</a>
+
+      <nav class="nav">
+        <a class="nav-link active" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>My Workspace</span></a>
+        <a class="nav-link" href="/projects.html"><span class="nav-icon nav-projects"></span><span>Projects</span></a>
+        <a class="nav-link" href="/tasks.html"><span class="nav-icon nav-tasks"></span><span>Tasks</span></a>
+        <a class="nav-link" href="/myday.html"><span class="nav-icon nav-myday"></span><span>My Day</span></a>
+        <a class="nav-link" href="/settings.html"><span class="nav-icon nav-settings"></span><span>Settings</span></a>
+      </nav>
+
+      <button class="sidebar-user" onclick="confirmLogout()">
+        <div id="sidebar-avatar" class="avatar-lite">U</div>
+        <div>
+          <div class="name" id="sidebar-name">User</div>
+          <div class="role" id="sidebar-role">Sign out</div>
+        </div>
+      </button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 class="page-title">My Workspace</h2>
+          <p class="page-subtitle">Your assigned execution queue with deadlines and project context.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-chip" id="topbar-user"></div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="page-section">
+          <div class="section-header">
+            <div>
+              <h3 class="section-title">Assigned To Me</h3>
+              <p class="section-copy">Only tasks you own right now.</p>
+            </div>
+            <a class="btn-soft" href="/tasks.html">Open Tasks</a>
+          </div>
+          <div class="list" id="assigned-list"></div>
+        </div>
+
+        <div class="page-section split-layout">
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">My Day Snapshot</div>
+                  <div class="panel-copy">Overdue, due today, and upcoming tasks.</div>
+                </div>
+                <a class="btn-soft" href="/myday.html">Open My Day</a>
+              </div>
+              <div class="list" id="myday-list"></div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Notifications</div>
+                  <div class="panel-copy">Assignments and updates that need your attention.</div>
+                </div>
+                <button class="btn-soft" onclick="markAllNotificationsRead()">Mark all read</button>
+              </div>
+              <div class="message-list" id="notif-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('auth required');
+
+    const user = getUser();
+    if (user.role !== 'developer') {
+      routeToRoleDashboard();
+    }
+
+    document.getElementById('sidebar-avatar').textContent = initials(user.name);
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
+    document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Developer')}</div></div>`;
+
+    function renderAssigned(tasks) {
+      if (!tasks.length) {
+        document.getElementById('assigned-list').innerHTML = '<div class="empty">No active assignments. You are clear for now.</div>';
+        return;
+      }
+
+      document.getElementById('assigned-list').innerHTML = tasks.slice(0, 8).map((task) => `
+        <div class="task-row">
+          <div>
+            <div class="task-title">${escapeHtml(task.title)}</div>
+            <div class="task-sub">${escapeHtml(task.project?.name || 'Project')} - ${task.dueDate ? fmtDate(task.dueDate) : 'No due date'}</div>
+            <div class="message-meta" style="margin-top:6px; max-width:760px;">Purpose: ${escapeHtml(task.description || task.project?.description || 'No purpose added for this task yet.')}</div>
+          </div>
+          <div><span class="badge ${task.status === 'done' ? 'done' : task.status === 'inprogress' ? 'progress' : 'todo'}">${task.status === 'inprogress' ? 'In Progress' : task.status === 'done' ? 'Done' : 'To Do'}</span></div>
+          <div class="meta-text">${escapeHtml(task.priority || 'medium')}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderMyDay(data) {
+      const items = [
+        ...data.overdue.map((task) => ({ ...task, label: 'Overdue', tone: 'pill-danger' })),
+        ...data.todayTasks.map((task) => ({ ...task, label: 'Today', tone: 'pill-muted' })),
+        ...data.dueSoon.map((task) => ({ ...task, label: 'Due Soon', tone: 'pill-ok' })),
+      ];
+
+      if (!items.length) {
+        document.getElementById('myday-list').innerHTML = '<div class="empty">No urgent work in your queue.</div>';
+        return;
+      }
+
+      document.getElementById('myday-list').innerHTML = items.slice(0, 6).map((task) => `
+        <div class="list-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(task.title)}</div>
+              <div class="task-sub">${escapeHtml(task.project?.name || 'Project')} - ${fmtDate(task.dueDate)}</div>
+              <div class="message-meta" style="margin-top:6px; max-width:760px;">Purpose: ${escapeHtml(task.description || task.project?.description || 'No purpose added for this task yet.')}</div>
+            </div>
+            <span class="pill ${task.tone}">${task.label}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderNotifications(notes) {
+      if (!notes.length) {
+        document.getElementById('notif-list').innerHTML = '<div class="empty">No notifications yet.</div>';
+        return;
+      }
+
+      document.getElementById('notif-list').innerHTML = notes.map((note) => `
+        <div class="message-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(note.message)}</div>
+              <div class="message-meta">${timeAgo(note.createdAt)}</div>
+            </div>
+            ${note.isRead ? '<span class="pill pill-muted">Read</span>' : `<button class="btn-soft" onclick="markNotificationRead('${note._id}')">Mark read</button>`}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadAssignedTasks() {
+      const projects = await api('/projects') || [];
+      const taskGroups = await Promise.all(projects.map((project) => api(`/projects/${project._id}/tasks`)));
+      const assigned = taskGroups
+        .flatMap((tasks) => tasks || [])
+        .filter((task) => task.assignee && task.assignee._id === user.id && task.status !== 'done');
+      renderAssigned(assigned);
+    }
+
+    async function loadDashboard() {
+      const [myDay, notes] = await Promise.all([
+        api('/myday'),
+        api('/notifications'),
+      ]);
+      await loadAssignedTasks();
+      renderMyDay(myDay || { overdue: [], todayTasks: [], dueSoon: [] });
+      renderNotifications(notes || []);
+    }
+
+    async function markNotificationRead(id) {
+      const updated = await api(`/notifications/${id}/read`, { method: 'PATCH' });
+      if (updated) loadDashboard();
+    }
+
+    async function markAllNotificationsRead() {
+      const updated = await api('/notifications/read-all', { method: 'PATCH' });
+      if (updated) loadDashboard();
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

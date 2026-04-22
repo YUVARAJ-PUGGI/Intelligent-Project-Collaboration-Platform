@@ -17,7 +17,7 @@
         </div>
       </div>
 
-      <button class="new-project-btn" onclick="openTaskModal()">Create Task</button>
+      <button class="new-project-btn" id="create-task-sidebar-btn" onclick="openTaskModal()">Create Task</button>
 
       <nav class="nav">
         <a class="nav-link" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>Dashboard</span></a>
@@ -62,7 +62,7 @@
                   <div class="panel-title">Tasks</div>
                   <div class="panel-copy">Plan, assign, and update delivery for this project.</div>
                 </div>
-                <button class="action-btn" onclick="openTaskModal()">New Task</button>
+                <button class="action-btn" id="new-task-panel-btn" onclick="openTaskModal()">New Task</button>
               </div>
               <div class="list" id="task-list"></div>
             </div>
@@ -70,16 +70,16 @@
             <div class="panel">
               <div class="section-header">
                 <div>
-                  <div class="panel-title">Discussion</div>
-                  <div class="panel-copy">Capture decisions and turn important notes into tasks.</div>
+                  <div class="panel-title">Task Context Chat</div>
+                  <div class="panel-copy">Select a task, then keep all technical discussion tied to that task.</div>
                 </div>
               </div>
               <form onsubmit="sendMessage(event)">
                 <div class="form-row">
-                  <textarea id="message-input" placeholder="Share an update, risk, or blocker with the team."></textarea>
+                  <textarea id="message-input" placeholder="Share blockers, decisions, and logs for the selected task."></textarea>
                 </div>
                 <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
-                  <button type="submit" class="action-btn">Post Update</button>
+                  <button type="submit" class="action-btn">Post Comment</button>
                 </div>
               </form>
               <div class="message-list" id="message-list" style="margin-top:18px;"></div>
@@ -98,8 +98,8 @@
 
           <div class="stack">
             <div class="panel">
-              <div class="panel-title">Members</div>
-              <div class="panel-copy">Current team, role ownership, and delivery load.</div>
+              <div class="panel-title">Developers Availability</div>
+              <div class="panel-copy">Developers from the Developer collection who can be added to this project.</div>
               <div class="list" id="member-list" style="margin-top:18px;"></div>
             </div>
 
@@ -191,6 +191,7 @@
     if (!requireAuth()) throw new Error('auth required');
 
     const user = getUser();
+    const isManager = canManageWorkspace();
     const projectId = new URLSearchParams(window.location.search).get('id');
     if (!projectId) window.location.href = '/projects.html';
 
@@ -204,7 +205,13 @@
     let messages = [];
     let activity = [];
     let workload = [];
+    let availableDevelopers = [];
     let risks = { overdue: [], dueSoon: [], stale: [] };
+    let health = { level: 'green', score: 0 };
+    let selectedTaskId = '';
+
+    document.getElementById('create-task-sidebar-btn').classList.toggle('hidden', !isManager);
+    document.getElementById('new-task-panel-btn').classList.toggle('hidden', !isManager);
 
     function closeModal(id) {
       document.getElementById(id).classList.remove('open');
@@ -215,27 +222,78 @@
     }
 
     function populateAssigneeOptions(selectedId = '') {
+      const selectedTaskId = document.getElementById('task-id').value;
+      const selectedTask = selectedTaskId ? tasks.find((task) => task._id === selectedTaskId) : null;
+      const selectedAssignee = selectedTask?.assignee || null;
+      const developers = (project?.members || []).filter((member) => member.user?.role === 'developer');
+
       const options = ['<option value="">Unassigned</option>'].concat(
-        (project?.members || []).map((member) => `
+        developers.map((member) => `
           <option value="${member.user._id}" ${member.user._id === selectedId ? 'selected' : ''}>${escapeHtml(member.user.name)}</option>
         `)
       );
+
+      if (selectedAssignee && !developers.some((member) => member.user._id === selectedAssignee._id)) {
+        options.push(`<option value="${selectedAssignee._id}" selected>${escapeHtml(selectedAssignee.name)} (non-developer)</option>`);
+      }
+
       document.getElementById('task-assignee').innerHTML = options.join('');
+    }
+
+    function formatAssignmentWarning(check) {
+      const extensionText = check.suggestedExtensionHours
+        ? `Suggested extension: ${check.suggestedExtensionHours} hours.`
+        : 'Suggested extension: 2 hours.';
+      const alternativeText = check.alternative
+        ? `Alternative: ${check.alternative.name} (${check.alternative.activeTasks} active, ${check.alternative.urgentTasks} due in 12h).`
+        : 'Alternative: No lower-load developer available right now.';
+
+      return [
+        check.suggestion,
+        '',
+        `Current load: ${check.metrics.activeTasks} active task(s), ${check.metrics.highPriorityDueSoon} high-priority due in next 12h.`,
+        extensionText,
+        alternativeText,
+        '',
+        'Proceed anyway?',
+      ].join('\n');
     }
 
     function openTaskModal(id = '') {
       if (!project) return;
 
+      const developers = (project.members || []).filter((member) => member.user?.role === 'developer');
+
       const task = id ? tasks.find((item) => item._id === id) : null;
+      if (!isManager && !task) {
+        showToast('Only managers can create and assign tasks.', 'error');
+        return;
+      }
+
+      if (isManager && !task && !developers.length) {
+        showToast('No developers are available in this workspace yet. Add a developer first.', 'error');
+        return;
+      }
+
       document.getElementById('task-id').value = task?._id || '';
       document.getElementById('task-modal-title').textContent = task ? 'Edit Task' : 'Create Task';
-      document.getElementById('delete-task-btn').classList.toggle('hidden', !task);
+      document.getElementById('delete-task-btn').classList.toggle('hidden', !task || !isManager);
       populateAssigneeOptions(task?.assignee?._id || '');
       document.getElementById('task-title').value = task?.title || '';
       document.getElementById('task-desc').value = task?.description || '';
       document.getElementById('task-status').value = task?.status || 'todo';
       document.getElementById('task-priority').value = task?.priority || 'medium';
       document.getElementById('task-due').value = task?.dueDate ? task.dueDate.substring(0, 10) : '';
+
+      ['task-assignee', 'task-title', 'task-desc', 'task-priority', 'task-due'].forEach((idAttr) => {
+        document.getElementById(idAttr).disabled = !isManager;
+      });
+
+      if (task?._id) {
+        selectedTaskId = task._id;
+        loadTaskMessages(task._id);
+      }
+
       document.getElementById('modal-task').classList.add('open');
     }
 
@@ -264,7 +322,7 @@
         </article>
         <article class="stat-card">
           <div class="stat-icon completed">RS</div>
-          <div><div class="stat-title">Risk Signals</div><div class="stat-value">${risky}</div></div>
+          <div><div class="stat-title">Health</div><div class="stat-value">${String(health.level || 'green').toUpperCase()} (${health.score})</div></div>
         </article>
       `;
     }
@@ -291,8 +349,13 @@
     }
 
     function renderMessages() {
+      if (!selectedTaskId) {
+        document.getElementById('message-list').innerHTML = '<div class="empty">Select a task to view and post contextual comments.</div>';
+        return;
+      }
+
       if (!messages.length) {
-        document.getElementById('message-list').innerHTML = '<div class="empty">No updates posted yet. Start the conversation here.</div>';
+        document.getElementById('message-list').innerHTML = '<div class="empty">No comments yet. Add the first task-context note.</div>';
         return;
       }
 
@@ -306,7 +369,7 @@
                 <div class="message-meta">${timeAgo(message.createdAt)}</div>
               </div>
             </div>
-            ${message.convertedToTask ? '<span class="pill pill-ok">Converted to task</span>' : `<button class="btn-soft" onclick="convertMessage('${message._id}')">Convert to Task</button>`}
+            ${message.convertedToTask ? '<span class="pill pill-ok">Converted to task</span>' : ''}
           </div>
           <div class="card-copy">${escapeHtml(message.content)}</div>
         </div>
@@ -328,27 +391,31 @@
     }
 
     function renderMembers() {
-      if (!workload.length) {
-        document.getElementById('member-list').innerHTML = '<div class="empty">No member information available.</div>';
+      const addableRows = (isManager ? availableDevelopers : [])
+        .filter((entry) => !entry.isMember)
+        .map((entry) => `
+          <div class="member-row">
+            <div class="avatar-row">
+              ${avatarHtml(entry.user.name, entry.user.avatarColor, 'sm')}
+              <div>
+                <div class="task-title">${escapeHtml(entry.user.name)}</div>
+                <div class="task-sub">${escapeHtml(entry.user.email)}</div>
+              </div>
+            </div>
+            <div class="inline-actions">
+              <span class="pill pill-muted">Available</span>
+              <button class="btn-soft" onclick="addDeveloperByEmail('${escapeHtml(entry.user.email)}')">Add to Project</button>
+            </div>
+          </div>
+        `)
+        .join('');
+
+      if (!addableRows) {
+        document.getElementById('member-list').innerHTML = '<div class="empty">No available developers found in the Developer collection.</div>';
         return;
       }
 
-      document.getElementById('member-list').innerHTML = workload.map((member) => `
-        <div class="member-row">
-          <div class="avatar-row">
-            ${avatarHtml(member.user.name, member.user.avatarColor, 'sm')}
-            <div>
-              <div class="task-title">${escapeHtml(member.user.name)}</div>
-              <div class="task-sub">${escapeHtml(member.user.title || member.role)}</div>
-            </div>
-          </div>
-          <div class="inline-actions">
-            <span class="pill pill-muted">${member.active} active</span>
-            <span class="pill pill-ok">${member.done} done</span>
-            ${member.isOverloaded ? '<span class="pill pill-danger">Busy</span>' : ''}
-          </div>
-        </div>
-      `).join('');
+      document.getElementById('member-list').innerHTML = addableRows;
     }
 
     function renderRisks() {
@@ -377,13 +444,14 @@
     }
 
     async function loadWorkspace() {
-      const [projectData, taskData, messageData, activityData, riskData, workloadData] = await Promise.all([
+      const [projectData, taskData, activityData, riskData, workloadData, healthData, availableDevData] = await Promise.all([
         api(`/projects/${projectId}`),
         api(`/projects/${projectId}/tasks`),
-        api(`/projects/${projectId}/messages`),
         api(`/projects/${projectId}/activity`),
         api(`/projects/${projectId}/risks`),
         api(`/projects/${projectId}/workload`),
+        api(`/projects/${projectId}/health-score`),
+        isManager ? api(`/projects/${projectId}/available-developers`) : Promise.resolve([]),
       ]);
 
       if (!projectData) {
@@ -393,10 +461,20 @@
 
       project = projectData;
       tasks = taskData || [];
-      messages = messageData || [];
+      messages = [];
       activity = activityData || [];
       risks = riskData || { overdue: [], dueSoon: [], stale: [] };
       workload = workloadData || [];
+      availableDevelopers = availableDevData || [];
+      health = healthData || { level: 'green', score: 0 };
+
+      if (!selectedTaskId && tasks.length) {
+        selectedTaskId = tasks[0]._id;
+      }
+
+      if (selectedTaskId) {
+        await loadTaskMessages(selectedTaskId);
+      }
 
       renderProjectSummary();
       renderTasks();
@@ -410,15 +488,35 @@
       event.preventDefault();
 
       const id = document.getElementById('task-id').value;
-      const payload = {
-        project: projectId,
-        assignee: document.getElementById('task-assignee').value || null,
-        title: document.getElementById('task-title').value,
-        description: document.getElementById('task-desc').value,
-        status: document.getElementById('task-status').value,
-        priority: document.getElementById('task-priority').value,
-        dueDate: document.getElementById('task-due').value || null,
-      };
+      const payload = isManager
+        ? {
+            project: projectId,
+            assignee: document.getElementById('task-assignee').value || null,
+            title: document.getElementById('task-title').value,
+            description: document.getElementById('task-desc').value,
+            status: document.getElementById('task-status').value,
+            priority: document.getElementById('task-priority').value,
+            dueDate: document.getElementById('task-due').value || null,
+          }
+        : {
+            status: document.getElementById('task-status').value,
+          };
+
+      if (isManager && payload.assignee) {
+        const check = await api(`/projects/${projectId}/assignment-check`, {
+          method: 'POST',
+          body: JSON.stringify({
+            assigneeId: payload.assignee,
+            dueDate: payload.dueDate,
+            priority: payload.priority,
+          }),
+        });
+
+        if (check && check.isOverloaded) {
+          const proceed = window.confirm(formatAssignmentWarning(check));
+          if (!proceed) return;
+        }
+      }
 
       const response = id
         ? await api(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
@@ -432,6 +530,11 @@
     }
 
     async function deleteTask() {
+      if (!isManager) {
+        showToast('Only managers can delete tasks.', 'error');
+        return;
+      }
+
       const id = document.getElementById('task-id').value;
       if (!id || !window.confirm('Delete this task?')) return;
       const response = await api(`/tasks/${id}`, { method: 'DELETE' });
@@ -445,8 +548,15 @@
       const response = await api(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'done' }) });
       if (response) {
         showToast('Task marked as done.', 'success');
+        selectedTaskId = id;
         loadWorkspace();
       }
+    }
+
+    async function loadTaskMessages(taskId) {
+      selectedTaskId = taskId;
+      messages = await api(`/messages/task/${taskId}`) || [];
+      renderMessages();
     }
 
     async function sendMessage(event) {
@@ -455,23 +565,20 @@
       const content = textarea.value.trim();
       if (!content) return;
 
-      const response = await api('/messages', {
+      if (!selectedTaskId) {
+        showToast('Select a task first to post a contextual comment.', 'error');
+        return;
+      }
+
+      const response = await api(`/messages/task/${selectedTaskId}`, {
         method: 'POST',
-        body: JSON.stringify({ project: projectId, content }),
+        body: JSON.stringify({ content }),
       });
 
       if (!response) return;
       textarea.value = '';
-      showToast('Update posted.', 'success');
-      loadWorkspace();
-    }
-
-    async function convertMessage(id) {
-      const response = await api(`/messages/${id}/convert`, { method: 'POST' });
-      if (response) {
-        showToast('Message converted into a task.', 'success');
-        loadWorkspace();
-      }
+      showToast('Comment posted.', 'success');
+      loadTaskMessages(selectedTaskId);
     }
 
     async function addMember(event) {
@@ -486,6 +593,17 @@
       document.getElementById('member-email').value = '';
       closeModal('modal-member');
       showToast('Member added to the project.', 'success');
+      loadWorkspace();
+    }
+
+    async function addDeveloperByEmail(email) {
+      const response = await api(`/projects/${projectId}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response) return;
+      showToast('Developer added to the project.', 'success');
       loadWorkspace();
     }
 

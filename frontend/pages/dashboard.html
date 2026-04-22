@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - SynergySphere</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <script>
+    (function routeDashboardByRole() {
+      try {
+        const rawUser = localStorage.getItem('user');
+        if (!rawUser) {
+          window.location.replace('/index.html');
+          return;
+        }
+        const user = JSON.parse(rawUser);
+        const target = user.role === 'manager' ? '/manager-dashboard.html' : '/developer-dashboard.html';
+        window.location.replace(target);
+      } catch (err) {
+        window.location.replace('/index.html');
+      }
+    })();
+  </script>
 </head>
 <body>
   <div class="app-shell">

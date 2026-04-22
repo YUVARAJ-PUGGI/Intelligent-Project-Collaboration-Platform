@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - SynergySphere</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>Connected workspaces for teams that ship together.</p>
+        </div>
+      </div>
+
+      <button class="new-project-btn" onclick="openCreateProject()">Create Project</button>
+
+      <nav class="nav">
+        <a class="nav-link active" href="/dashboard.html"><span class="nav-icon nav-dashboard"></span><span>Dashboard</span></a>
+        <a class="nav-link" href="/projects.html"><span class="nav-icon nav-projects"></span><span>Projects</span></a>
+        <a class="nav-link" href="/tasks.html"><span class="nav-icon nav-tasks"></span><span>Tasks</span></a>
+        <a class="nav-link" href="/team.html"><span class="nav-icon nav-team"></span><span>Team</span></a>
+        <a class="nav-link" href="/myday.html"><span class="nav-icon nav-myday"></span><span>My Day</span></a>
+        <a class="nav-link" href="/settings.html"><span class="nav-icon nav-settings"></span><span>Settings</span></a>
+      </nav>
+
+      <button class="sidebar-user" onclick="confirmLogout()">
+        <div id="sidebar-avatar" class="avatar-lite">U</div>
+        <div>
+          <div class="name" id="sidebar-name">User</div>
+          <div class="role" id="sidebar-role">Sign out</div>
+        </div>
+      </button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 class="page-title">Workspace Dashboard</h2>
+          <p class="page-subtitle">A live snapshot of project health, workload, and the work due next.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-chip" id="topbar-user"></div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="page-section">
+          <div class="section-header">
+            <div>
+              <h3 class="section-title">Overview</h3>
+              <p class="section-copy">Everything important from your projects in one place.</p>
+            </div>
+          </div>
+          <div class="stats-grid" id="stats-grid"></div>
+        </div>
+
+        <div class="page-section split-layout">
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Recent Projects</div>
+                  <div class="panel-copy">Track momentum, ownership, and completion across your active work.</div>
+                </div>
+                <a class="btn-soft" href="/projects.html">Open Projects</a>
+              </div>
+              <div class="list" id="project-list"></div>
+            </div>
+
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">My Day Snapshot</div>
+                  <div class="panel-copy">Tasks due today, overdue work, and what needs attention next.</div>
+                </div>
+                <a class="btn-soft" href="/myday.html">Open My Day</a>
+              </div>
+              <div class="list" id="myday-list"></div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Notifications</div>
+                  <div class="panel-copy">Fresh updates from assignments, deadlines, and project changes.</div>
+                </div>
+                <button class="btn-soft" onclick="markAllNotificationsRead()">Mark all read</button>
+              </div>
+              <div class="message-list" id="notif-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal-create-project">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="section-title" style="font-size:1.6rem;">Create Project</h3>
+        <p class="panel-copy">Start a fresh workspace and invite your team after it is created.</p>
+      </div>
+      <form onsubmit="createProject(event)">
+        <div class="form-grid">
+          <div class="form-row">
+            <label class="form-label" for="cp-name">Project name</label>
+            <input id="cp-name" required>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="cp-color">Accent color</label>
+            <select id="cp-color">
+              <option value="#5b57f5">Indigo</option>
+              <option value="#1c9c67">Emerald</option>
+              <option value="#cf4a61">Rose</option>
+              <option value="#0a7f8b">Teal</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:16px;">
+          <label class="form-label" for="cp-desc">Description</label>
+          <textarea id="cp-desc" placeholder="What is this project trying to deliver?"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-soft" onclick="closeModal('modal-create-project')">Cancel</button>
+          <button type="submit" class="action-btn">Create Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('auth required');
+
+    const user = getUser();
+    if (user.role !== 'manager') {
+      routeToRoleDashboard();
+    }
+
+    document.getElementById('sidebar-avatar').textContent = initials(user.name);
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
+    document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
+
+    function openCreateProject() {
+      document.getElementById('modal-create-project').classList.add('open');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    function renderStats(projects) {
+      const totalProjects = projects.length;
+      const activeProjects = projects.filter((project) => project.stats.total > 0 && project.stats.pct < 100).length;
+      const pendingTasks = projects.reduce((sum, project) => sum + Math.max(project.stats.total - project.stats.done, 0), 0);
+      const completedTasks = projects.reduce((sum, project) => sum + project.stats.done, 0);
+
+      document.getElementById('stats-grid').innerHTML = `
+        <article class="stat-card">
+          <div class="stat-icon total">PR</div>
+          <div><div class="stat-title">Total Projects</div><div class="stat-value">${totalProjects}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon active">AC</div>
+          <div><div class="stat-title">Active Projects</div><div class="stat-value">${activeProjects}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon pending">PD</div>
+          <div><div class="stat-title">Pending Tasks</div><div class="stat-value">${pendingTasks}</div></div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon completed">DN</div>
+          <div><div class="stat-title">Completed Tasks</div><div class="stat-value">${completedTasks}</div></div>
+        </article>
+      `;
+    }
+
+    function renderProjects(projects) {
+      if (!projects.length) {
+        document.getElementById('project-list').innerHTML = '<div class="empty">No projects yet. Create one to start collaborating.</div>';
+        return;
+      }
+
+      document.getElementById('project-list').innerHTML = projects.slice(0, 4).map((project) => `
+        <article class="project-card">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="project-title">${escapeHtml(project.name)}</div>
+              <div class="project-meta">${escapeHtml(project.description || 'No description yet')}</div>
+            </div>
+            <span class="pill pill-muted">${project.members.length} members</span>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-card">
+              <div class="meta-label">Progress</div>
+              <div class="meta-value">${project.stats.pct}% complete</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Overdue</div>
+              <div class="meta-value">${project.stats.overdue} tasks</div>
+            </div>
+          </div>
+          <div class="mini-progress"><div style="width:${project.stats.pct}%; background:${escapeHtml(project.color || '#5b57f5')}"></div></div>
+          <div class="inline-actions">
+            <a class="btn-soft" href="/project.html?id=${project._id}">Open Workspace</a>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderMyDay(data) {
+      const items = [
+        ...data.overdue.map((task) => ({ ...task, label: 'Overdue', tone: 'pill-danger' })),
+        ...data.todayTasks.map((task) => ({ ...task, label: 'Today', tone: 'pill-muted' })),
+        ...data.dueSoon.map((task) => ({ ...task, label: 'Due Soon', tone: 'pill-ok' })),
+      ];
+
+      if (!items.length) {
+        document.getElementById('myday-list').innerHTML = '<div class="empty">No urgent work right now. Your day is clear.</div>';
+        return;
+      }
+
+      document.getElementById('myday-list').innerHTML = items.slice(0, 6).map((task) => `
+        <div class="list-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(task.title)}</div>
+              <div class="task-sub">${escapeHtml(task.project?.name || 'Project')} - ${fmtDate(task.dueDate)}</div>
+              <div class="message-meta" style="margin-top:6px; max-width:760px;">Purpose: ${escapeHtml(task.description || task.project?.description || 'No purpose added for this task yet.')}</div>
+            </div>
+            <span class="pill ${task.tone}">${task.label}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderNotifications(notes) {
+      if (!notes.length) {
+        document.getElementById('notif-list').innerHTML = '<div class="empty">No notifications yet. You are up to date.</div>';
+        return;
+      }
+
+      document.getElementById('notif-list').innerHTML = notes.map((note) => `
+        <div class="message-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(note.message)}</div>
+              <div class="message-meta">${timeAgo(note.createdAt)}</div>
+            </div>
+            ${note.isRead ? '<span class="pill pill-muted">Read</span>' : `<button class="btn-soft" onclick="markNotificationRead('${note._id}')">Mark read</button>`}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadDashboard() {
+      const [projects, myDay, notes] = await Promise.all([
+        api('/projects'),
+        api('/myday'),
+        api('/notifications'),
+      ]);
+
+      renderStats(projects || []);
+      renderProjects(projects || []);
+      renderMyDay(myDay || { overdue: [], todayTasks: [], dueSoon: [] });
+      renderNotifications(notes || []);
+    }
+
+    async function createProject(event) {
+      event.preventDefault();
+      const created = await api('/projects', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: document.getElementById('cp-name').value,
+          description: document.getElementById('cp-desc').value,
+          color: document.getElementById('cp-color').value,
+        }),
+      });
+
+      if (!created) return;
+      closeModal('modal-create-project');
+      showToast('Project created successfully.', 'success');
+      event.target.reset();
+      loadDashboard();
+    }
+
+    async function markNotificationRead(id) {
+      const updated = await api(`/notifications/${id}/read`, { method: 'PATCH' });
+      if (updated) loadDashboard();
+    }
+
+    async function markAllNotificationsRead() {
+      const updated = await api('/notifications/read-all', { method: 'PATCH' });
+      if (updated) loadDashboard();
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

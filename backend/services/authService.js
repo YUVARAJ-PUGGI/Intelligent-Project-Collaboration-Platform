@@ -9,6 +9,7 @@ function toSafeUser(user) {
     id: user._id,
     name: user.name,
     email: user.email,
+    role: user.role,
     avatarColor: user.avatarColor,
     title: user.title,
     bio: user.bio,

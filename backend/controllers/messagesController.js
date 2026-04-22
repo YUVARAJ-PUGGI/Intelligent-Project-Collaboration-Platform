@@ -8,16 +8,66 @@ async function canAccessProject(projectId, userId) {
   return Project.exists({ _id: projectId, 'members.user': userId });
 }
 
-async function sendMessage(req, res) {
+async function resolveAccessibleTask(taskId, userId) {
+  const task = await Task.findById(taskId);
+  if (!task) return null;
+
+  const hasAccess = await canAccessProject(task.project, userId);
+  if (!hasAccess) return 'forbidden';
+
+  return task;
+}
+
+async function listTaskMessages(req, res) {
   try {
-    const { project, content } = req.body;
-    const hasAccess = await canAccessProject(project, req.user._id);
-    if (!hasAccess) {
-      return res.status(403).json({ message: 'You cannot post in that project' });
+    const task = await resolveAccessibleTask(req.params.taskId, req.user._id);
+    if (task === 'forbidden') {
+      return res.status(403).json({ message: 'You cannot view this task chat' });
+    }
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
     }
 
-    const message = await Message.create({ project, sender: req.user._id, content });
-    const populatedMessage = await Message.findById(message._id).populate('sender', 'name avatarColor title');
+    const messages = await Message.find({ task: task._id })
+      .populate('sender', 'name avatarColor title')
+      .populate('convertedToTask', 'title status')
+      .sort('createdAt')
+      .limit(200);
+
+    return res.json(messages);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+}
+
+async function sendTaskMessage(req, res) {
+  try {
+    const taskId = req.params.taskId || req.body.task;
+    const { content } = req.body;
+
+    if (!taskId) {
+      return res.status(400).json({ message: 'taskId is required' });
+    }
+
+    const task = await resolveAccessibleTask(taskId, req.user._id);
+    if (task === 'forbidden') {
+      return res.status(403).json({ message: 'You cannot post in that task chat' });
+    }
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const message = await Message.create({
+      project: task.project,
+      task: task._id,
+      sender: req.user._id,
+      content,
+    });
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'name avatarColor title')
+      .populate('convertedToTask', 'title status');
+
     return res.status(201).json(populatedMessage);
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -64,6 +114,7 @@ async function convertMessageToTask(req, res) {
 }
 
 module.exports = {
-  sendMessage,
+  listTaskMessages,
+  sendTaskMessage,
   convertMessageToTask,
 };

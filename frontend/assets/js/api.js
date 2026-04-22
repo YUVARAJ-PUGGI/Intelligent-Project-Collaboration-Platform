@@ -8,6 +8,27 @@ function getUser() {
   return JSON.parse(localStorage.getItem('user') || 'null');
 }
 
+function roleDashboardPath(user = getUser()) {
+  if (!user) return '/index.html';
+  return user.role === 'manager' ? '/manager-dashboard.html' : '/developer-dashboard.html';
+}
+
+function routeToRoleDashboard() {
+  window.location.href = roleDashboardPath();
+}
+
+function applyRoleNavigation() {
+  const dashboardHref = roleDashboardPath();
+  document.querySelectorAll('a[href="/dashboard.html"]').forEach((link) => {
+    link.setAttribute('href', dashboardHref);
+  });
+}
+
+function canManageWorkspace() {
+  const user = getUser();
+  return Boolean(user && user.role === 'manager');
+}
+
 function setAuth(token, user) {
   localStorage.setItem('token', token);
   localStorage.setItem('user', JSON.stringify(user));
@@ -35,6 +56,8 @@ function requireAuth() {
     window.location.href = '/index.html';
     return false;
   }
+
+  applyRoleNavigation();
   return true;
 }
 

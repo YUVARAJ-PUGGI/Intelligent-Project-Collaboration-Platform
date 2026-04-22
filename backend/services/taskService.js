@@ -1,3 +1,18 @@
+function normalizeStatus(value) {
+  if (!value) return 'todo';
+  const normalized = String(value).trim().toLowerCase().replace('-', '').replace(/\s+/g, '');
+  if (normalized === 'inprogress') return 'inprogress';
+  if (normalized === 'done') return 'done';
+  return 'todo';
+}
+
+function normalizePriority(value) {
+  if (!value) return 'medium';
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'low' || normalized === 'high') return normalized;
+  return 'medium';
+}
+
 function buildTaskPayload(body, userId) {
   const { project, title, description, assignee, priority, dueDate, status } = body;
   return {
@@ -5,9 +20,9 @@ function buildTaskPayload(body, userId) {
     title,
     description,
     assignee: assignee || null,
-    priority,
+    priority: normalizePriority(priority),
     dueDate: dueDate || null,
-    status: status || 'todo',
+    status: normalizeStatus(status),
     createdBy: userId,
   };
 }
@@ -27,4 +42,6 @@ module.exports = {
   buildTaskPayload,
   getTaskUpdateAction,
   shouldNotifyAssignee,
+  normalizeStatus,
+  normalizePriority,
 };

@@ -15,7 +15,10 @@ function riskWindow() {
 }
 
 function isExistingMember(project, userId) {
-  return project.members.some((member) => member.user.toString() === userId.toString());
+  return project.members.some((member) => {
+    const memberId = member.user ? member.user.toString() : member.toString();
+    return memberId === userId.toString();
+  });
 }
 
 module.exports = {

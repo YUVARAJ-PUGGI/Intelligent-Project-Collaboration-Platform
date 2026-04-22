@@ -7,13 +7,13 @@ async function getMyDay(req, res) {
 
     const [todayTasks, dueSoon, overdue] = await Promise.all([
       Task.find({ assignee: req.user._id, status: { $ne: 'done' }, dueDate: { $gte: todayStart, $lte: todayEnd } })
-        .populate('project', 'name color')
+        .populate('project', 'name color description')
         .sort('priority'),
       Task.find({ assignee: req.user._id, status: { $ne: 'done' }, dueDate: { $gt: todayEnd, $lte: in3Days } })
-        .populate('project', 'name color')
+        .populate('project', 'name color description')
         .sort('dueDate'),
       Task.find({ assignee: req.user._id, status: { $ne: 'done' }, dueDate: { $lt: todayStart } })
-        .populate('project', 'name color')
+        .populate('project', 'name color description')
         .sort('dueDate'),
     ]);
 
