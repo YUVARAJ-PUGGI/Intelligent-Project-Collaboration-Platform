@@ -15,6 +15,18 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/myday', require('./routes/myday'));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', 'landing.html'));
+});
+
+app.get('/landing', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', 'landing.html'));
+});
+
+app.get('/landing.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', 'landing.html'));
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', 'index.html'));
 });

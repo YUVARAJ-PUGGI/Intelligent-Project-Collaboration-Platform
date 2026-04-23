@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SynergySphere - Connected Workspaces for Teams That Ship</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #eef2ff;
+      --bg-deep: #0b1020;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-deep: rgba(13, 18, 35, 0.76);
+      --line: rgba(148, 163, 184, 0.24);
+      --text: #111827;
+      --text-soft: #5b6476;
+      --brand: #5b57f5;
+      --brand-2: #00c2ff;
+      --brand-3: #7c3aed;
+      --brand-4: #ff6b8a;
+      --brand-5: #17d9a3;
+      --accent: #17b26a;
+      --accent-2: #ff7a59;
+      --shadow: 0 28px 80px rgba(15, 23, 42, 0.14);
+      --shadow-strong: 0 40px 120px rgba(15, 23, 42, 0.24);
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 20%, rgba(91, 87, 245, 0.24), transparent 24%),
+        radial-gradient(circle at 80% 10%, rgba(0, 194, 255, 0.2), transparent 20%),
+        radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.18), transparent 22%),
+        radial-gradient(circle at 30% 78%, rgba(255, 107, 138, 0.14), transparent 22%),
+        linear-gradient(180deg, #f9fbff 0%, var(--bg) 100%);
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+      z-index: 0;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+    }
+
+    .aurora {
+      position: fixed;
+      inset: -20% -8% auto -8%;
+      height: 64vh;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(42% 58% at 18% 30%, rgba(91, 87, 245, 0.26), transparent 70%),
+        radial-gradient(34% 42% at 74% 26%, rgba(0, 194, 255, 0.24), transparent 74%),
+        radial-gradient(32% 42% at 54% 62%, rgba(255, 107, 138, 0.19), transparent 78%),
+        radial-gradient(26% 36% at 84% 76%, rgba(23, 217, 163, 0.18), transparent 76%);
+      filter: blur(30px) saturate(1.08);
+      animation: auroraDrift 14s ease-in-out infinite alternate;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px clamp(20px, 4vw, 44px);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-badge {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #5b57f5 0%, #00c2ff 100%);
+      background-size: 180% 180%;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 1rem;
+      font-weight: 900;
+      box-shadow: 0 14px 30px rgba(91, 87, 245, 0.28);
+      flex: 0 0 auto;
+      animation: gradientShift 8s ease infinite;
+    }
+
+    .brand-copy h1 {
+      font-size: 1.1rem;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .brand-copy p {
+      color: var(--text-soft);
+      font-size: 0.88rem;
+      margin-top: 3px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn,
+    .btn-secondary,
+    .btn-ghost {
+      position: relative;
+      min-height: 48px;
+      border-radius: 14px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 800;
+      transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
+      border: 1px solid transparent;
+      overflow: hidden;
+    }
+
+    .btn::after,
+    .btn-secondary::after {
+      content: '';
+      position: absolute;
+      top: -70%;
+      left: -160%;
+      width: 60%;
+      height: 230%;
+      transform: rotate(20deg);
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.34) 52%, rgba(255,255,255,0) 100%);
+      transition: left 520ms ease;
+      pointer-events: none;
+    }
+
+    .btn:hover::after,
+    .btn-secondary:hover::after {
+      left: 125%;
+    }
+
+    .btn:hover,
+    .btn-secondary:hover,
+    .btn-ghost:hover { transform: translateY(-1px); }
+
+    .btn {
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-3) 100%);
+      box-shadow: 0 18px 42px rgba(91, 87, 245, 0.34);
+    }
+
+    .btn-secondary {
+      color: var(--text);
+      background: #fff;
+      border-color: rgba(148, 163, 184, 0.24);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .btn-ghost {
+      color: var(--text-soft);
+      background: transparent;
+      border-color: rgba(148, 163, 184, 0.24);
+    }
+
+    .hero {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1.15fr 0.95fr;
+      gap: clamp(24px, 5vw, 56px);
+      align-items: center;
+      padding: clamp(40px, 7vw, 90px) clamp(20px, 4vw, 44px) 40px;
+      max-width: 1320px;
+      margin: 0 auto;
+      overflow: hidden;
+      perspective: 1200px;
+    }
+
+    .hero-glow {
+      position: absolute;
+      width: min(50vw, 600px);
+      height: min(50vw, 600px);
+      border-radius: 50%;
+      filter: blur(34px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.9;
+      transform: translate3d(var(--gx, 0px), var(--gy, 0px), 0);
+      transition: transform 200ms ease;
+    }
+
+    .hero-glow.one {
+      left: -120px;
+      top: -90px;
+      background: radial-gradient(circle, rgba(91, 87, 245, 0.28), transparent 70%);
+      animation: pulseAura 7s ease-in-out infinite;
+    }
+
+    .hero-glow.two {
+      right: -140px;
+      bottom: -110px;
+      background: radial-gradient(circle, rgba(0, 194, 255, 0.24), transparent 72%);
+      animation: pulseAura 8s ease-in-out infinite reverse;
+    }
+
+    .hero-orbit {
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      z-index: 0;
+      background: linear-gradient(135deg, rgba(91, 87, 245, 0.18), rgba(0, 194, 255, 0.18));
+      border: 1px solid rgba(91, 87, 245, 0.2);
+      animation: orbitFloat 11s ease-in-out infinite;
+    }
+
+    .hero-orbit.a {
+      width: 180px;
+      height: 180px;
+      top: 14%;
+      right: 8%;
+    }
+
+    .hero-orbit.b {
+      width: 120px;
+      height: 120px;
+      bottom: 10%;
+      left: 4%;
+      animation-delay: -3.5s;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(91, 87, 245, 0.08);
+      border: 1px solid rgba(91, 87, 245, 0.14);
+      color: #4a45df;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+
+    .hero h2 {
+      font-size: clamp(3rem, 6.5vw, 6.2rem);
+      line-height: 0.94;
+      letter-spacing: -0.06em;
+      max-width: 11ch;
+      animation: rise 900ms ease both;
+    }
+
+    .hero h2 .gradient {
+      background: linear-gradient(135deg, #5b57f5 0%, #00c2ff 45%, #7c3aed 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .word-rotator {
+      display: inline-grid;
+      position: relative;
+      vertical-align: top;
+      height: 1em;
+      min-width: 6.4ch;
+      overflow: hidden;
+      margin: 0 0.08em;
+    }
+
+    .word-rotator span {
+      grid-area: 1 / 1;
+      background: linear-gradient(120deg, #5b57f5 0%, #00c2ff 36%, #ff6b8a 72%, #17d9a3 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      opacity: 0;
+      transform: translateY(100%);
+      animation: cycleWords 9s infinite;
+    }
+
+    .word-rotator span:nth-child(2) { animation-delay: 3s; }
+    .word-rotator span:nth-child(3) { animation-delay: 6s; }
+
+    .hero p {
+      margin-top: 20px;
+      max-width: 640px;
+      font-size: clamp(1rem, 1.4vw, 1.2rem);
+      line-height: 1.8;
+      color: var(--text-soft);
+      animation: rise 1000ms ease 100ms both;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 30px;
+      animation: rise 1050ms ease 180ms both;
+    }
+
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 28px;
+      max-width: 700px;
+    }
+
+    .metric {
+      padding: 18px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.5rem;
+      letter-spacing: -0.04em;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 6px;
+      color: var(--text-soft);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .showcase {
+      position: relative;
+      padding: 18px;
+      border-radius: 34px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.58));
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: var(--shadow-strong);
+      backdrop-filter: blur(14px);
+      overflow: hidden;
+      animation: floatCard 7s ease-in-out infinite;
+      transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+      transition: transform 200ms ease;
+      z-index: 1;
+    }
+
+    .showcase::before {
+      content: '';
+      position: absolute;
+      inset: -40% -20%;
+      background: radial-gradient(circle, rgba(91, 87, 245, 0.16), transparent 44%), radial-gradient(circle at 80% 20%, rgba(0, 194, 255, 0.12), transparent 36%);
+      pointer-events: none;
+    }
+
+    .mini-window {
+      position: relative;
+      border-radius: 26px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .mini-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #febc2e; }
+    .dot.green { background: #28c840; }
+
+    .mini-url {
+      flex: 1;
+      margin-left: 10px;
+      border-radius: 10px;
+      padding: 7px 12px;
+      color: rgba(255, 255, 255, 0.48);
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 0.72rem;
+      font-family: monospace;
+    }
+
+    .mini-body {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: 470px;
+    }
+
+    .mini-side {
+      padding: 18px 14px;
+      border-right: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .mini-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px 14px;
+    }
+
+    .mini-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #5b57f5 0%, #00c2ff 100%);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
+      font-weight: 900;
+    }
+
+    .mini-nav {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .mini-nav div {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      color: rgba(255, 255, 255, 0.48);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .mini-nav div.active {
+      background: rgba(91, 87, 245, 0.16);
+      color: #b9b7ff;
+    }
+
+    .mini-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .mini-main {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .mini-header,
+    .mini-card,
+    .mini-task {
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .mini-header {
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .mini-title {
+      color: rgba(255, 255, 255, 0.92);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .mini-sub {
+      color: rgba(255, 255, 255, 0.38);
+      font-size: 0.72rem;
+      margin-top: 4px;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .mini-card {
+      padding: 14px;
+    }
+
+    .mini-card strong {
+      display: block;
+      font-size: 1.2rem;
+      color: #fff;
+      letter-spacing: -0.04em;
+    }
+
+    .mini-card span {
+      display: block;
+      margin-top: 6px;
+      color: rgba(255, 255, 255, 0.36);
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+
+    .mini-surface-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mini-task {
+      padding: 14px;
+    }
+
+    .mini-task h4 {
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .mini-task p {
+      color: rgba(255, 255, 255, 0.36);
+      font-size: 0.7rem;
+      margin-top: 4px;
+      line-height: 1.45;
+    }
+
+    .mini-progress {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .mini-progress > div {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #5b57f5 0%, #00c2ff 100%);
+    }
+
+    .band {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 18px clamp(20px, 4vw, 44px) 54px;
+    }
+
+    .motion-strip {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 2px clamp(20px, 4vw, 44px) 28px;
+      overflow: hidden;
+    }
+
+    .motion-track {
+      display: flex;
+      gap: 14px;
+      width: max-content;
+      animation: ribbonSlide 24s linear infinite;
+    }
+
+    .motion-pill {
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #334155;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+      white-space: nowrap;
+    }
+
+    .motion-pill:nth-child(4n + 1) { color: #4a45df; background: rgba(91, 87, 245, 0.12); border-color: rgba(91, 87, 245, 0.2); }
+    .motion-pill:nth-child(4n + 2) { color: #0369a1; background: rgba(0, 194, 255, 0.12); border-color: rgba(0, 194, 255, 0.2); }
+    .motion-pill:nth-child(4n + 3) { color: #be185d; background: rgba(255, 107, 138, 0.12); border-color: rgba(255, 107, 138, 0.2); }
+    .motion-pill:nth-child(4n + 4) { color: #0f766e; background: rgba(23, 217, 163, 0.12); border-color: rgba(23, 217, 163, 0.2); }
+
+    .story-cinema {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 10px clamp(20px, 4vw, 44px) 72px;
+    }
+
+    .story-head {
+      margin-bottom: 18px;
+    }
+
+    .story-head h3 {
+      font-size: clamp(2rem, 4vw, 3.1rem);
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+    }
+
+    .story-head p {
+      margin-top: 12px;
+      color: var(--text-soft);
+      max-width: 760px;
+      line-height: 1.75;
+    }
+
+    .story-track {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(320px, 86%);
+      gap: 16px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      padding-bottom: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(91,87,245,0.4) transparent;
+    }
+
+    .story-track::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .story-track::-webkit-scrollbar-thumb {
+      background: rgba(91, 87, 245, 0.35);
+      border-radius: 999px;
+    }
+
+    .story-panel {
+      position: relative;
+      min-height: clamp(360px, 52vw, 520px);
+      border-radius: 28px;
+      padding: 26px;
+      color: #fff;
+      overflow: hidden;
+      scroll-snap-align: start;
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 26px 66px rgba(15, 23, 42, 0.24);
+      isolation: isolate;
+    }
+
+    .story-panel::before {
+      content: '';
+      position: absolute;
+      inset: -28% -24%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 62%);
+      animation: drift 11s ease-in-out infinite;
+      z-index: 0;
+    }
+
+    .story-panel.one { background: linear-gradient(140deg, #141a35 0%, #3f2df4 48%, #25b0ff 100%); }
+    .story-panel.two { background: linear-gradient(140deg, #091a2a 0%, #0ea5a4 44%, #7c3aed 100%); }
+    .story-panel.three { background: linear-gradient(140deg, #251035 0%, #ef476f 44%, #7c3aed 100%); }
+
+    .story-content {
+      position: relative;
+      z-index: 1;
+      max-width: 560px;
+    }
+
+    .story-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.24);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .story-content h4 {
+      font-size: clamp(1.6rem, 3.1vw, 2.7rem);
+      line-height: 1.06;
+      letter-spacing: -0.05em;
+    }
+
+    .story-content p {
+      margin-top: 14px;
+      color: rgba(255,255,255,0.84);
+      line-height: 1.8;
+      font-size: 0.98rem;
+      max-width: 52ch;
+    }
+
+    .story-chips {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .story-chip {
+      padding: 8px 11px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .cursor-trail {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1;
+      mix-blend-mode: screen;
+      filter: blur(24px);
+      opacity: 0;
+      transform: translate(-50%, -50%);
+      transition: opacity 240ms ease;
+    }
+
+    .cursor-trail.primary {
+      background: radial-gradient(circle, rgba(91,87,245,0.24), rgba(91,87,245,0.08) 45%, transparent 72%);
+    }
+
+    .cursor-trail.secondary {
+      width: 170px;
+      height: 170px;
+      background: radial-gradient(circle, rgba(0,194,255,0.25), rgba(0,194,255,0.08) 45%, transparent 74%);
+      filter: blur(20px);
+    }
+
+    .interactive-pop {
+      position: relative;
+      overflow: hidden;
+      transform: translateZ(0);
+      transition: box-shadow 220ms ease, border-color 220ms ease;
+    }
+
+    .interactive-pop:hover {
+      box-shadow: 0 20px 48px rgba(91, 87, 245, 0.16);
+      border-color: rgba(91, 87, 245, 0.24);
+    }
+
+    .interactive-pop .ripple {
+      position: absolute;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255,255,255,0.45), rgba(255,255,255,0.14) 45%, transparent 70%);
+      animation: ripplePop 580ms ease-out forwards;
+      mix-blend-mode: screen;
+    }
+
+    .band-inner {
+      border-radius: 28px;
+      background: linear-gradient(135deg, rgba(91, 87, 245, 0.92), rgba(0, 194, 255, 0.88));
+      color: #fff;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 24px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .band-inner::after {
+      content: '';
+      position: absolute;
+      inset: -20% -10%;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.2), transparent 24%), radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.18), transparent 26%);
+      pointer-events: none;
+    }
+
+    .band-copy h3 {
+      font-size: clamp(1.7rem, 3vw, 2.6rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    .band-copy p {
+      margin-top: 12px;
+      max-width: 620px;
+      color: rgba(255, 255, 255, 0.82);
+      line-height: 1.7;
+    }
+
+    .band-points {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .point {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(10px);
+    }
+
+    .point b { font-size: 0.94rem; }
+    .point span { display: block; font-size: 0.76rem; color: rgba(255, 255, 255, 0.72); margin-top: 3px; }
+
+    .reveal-item {
+      opacity: 0;
+      transform: translateY(26px) scale(0.985);
+      transition: opacity 700ms cubic-bezier(0.19, 1, 0.22, 1), transform 700ms cubic-bezier(0.19, 1, 0.22, 1);
+      transition-delay: var(--reveal-delay, 0ms);
+      will-change: opacity, transform;
+    }
+
+    .reveal-item.in-view {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .section {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 18px clamp(20px, 4vw, 44px) 80px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 26px;
+    }
+
+    .section-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(91, 87, 245, 0.08);
+      color: #4a45df;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 16px;
+    }
+
+    .section h3 {
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+    }
+
+    .section p.lead {
+      color: var(--text-soft);
+      max-width: 640px;
+      line-height: 1.8;
+      margin-top: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      border-radius: 24px;
+      padding: 24px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+      border-color: rgba(91, 87, 245, 0.2);
+    }
+
+    .icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, #5b57f5, #7c3aed);
+      box-shadow: 0 14px 32px rgba(91, 87, 245, 0.22);
+    }
+
+    .card h4 {
+      font-size: 1.1rem;
+      letter-spacing: -0.03em;
+    }
+
+    .card p {
+      color: var(--text-soft);
+      line-height: 1.75;
+      margin-top: 10px;
+      font-size: 0.96rem;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .step {
+      display: flex;
+      gap: 14px;
+      padding: 18px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .step-index {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      background: linear-gradient(135deg, rgba(91, 87, 245, 0.16), rgba(0, 194, 255, 0.18));
+      color: #4a45df;
+      font-weight: 900;
+    }
+
+    .step h5 {
+      font-size: 0.98rem;
+      letter-spacing: -0.03em;
+    }
+
+    .step p {
+      color: var(--text-soft);
+      margin-top: 6px;
+      line-height: 1.7;
+      font-size: 0.92rem;
+    }
+
+    .cta-panel {
+      padding: 18px clamp(20px, 4vw, 44px) 88px;
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+
+    .cta {
+      position: relative;
+      border-radius: 30px;
+      overflow: hidden;
+      padding: 34px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 32%),
+        linear-gradient(135deg, #10172a 0%, #0b1226 50%, #1d1950 100%);
+      color: #fff;
+      box-shadow: var(--shadow-strong);
+    }
+
+    .cta h3 {
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      line-height: 1.03;
+      letter-spacing: -0.05em;
+      max-width: 12ch;
+    }
+
+    .cta p {
+      margin-top: 14px;
+      max-width: 640px;
+      color: rgba(255, 255, 255, 0.76);
+      line-height: 1.8;
+    }
+
+    .cta-actions {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .tag {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .orbit {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(4px);
+      animation: drift 10s ease-in-out infinite;
+    }
+
+    .orbit.one {
+      width: 220px; height: 220px;
+      right: -60px; top: -50px;
+      background: radial-gradient(circle, rgba(0, 194, 255, 0.34), transparent 68%);
+    }
+
+    .orbit.two {
+      width: 160px; height: 160px;
+      right: 90px; bottom: -60px;
+      background: radial-gradient(circle, rgba(91, 87, 245, 0.26), transparent 68%);
+      animation-delay: -4s;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes orbitFloat {
+      0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+      50% { transform: translateY(-16px) translateX(6px) scale(1.04); }
+    }
+
+    @keyframes pulseAura {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50% { opacity: 0.55; transform: scale(1.08); }
+    }
+
+    @keyframes cycleWords {
+      0%, 10% { opacity: 0; transform: translateY(100%); }
+      14%, 30% { opacity: 1; transform: translateY(0); }
+      38%, 100% { opacity: 0; transform: translateY(-100%); }
+    }
+
+    @keyframes auroraDrift {
+      0% { transform: translate3d(0, 0, 0) scale(1); }
+      100% { transform: translate3d(2%, 3%, 0) scale(1.08); }
+    }
+
+    @keyframes ribbonSlide {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    @keyframes ripplePop {
+      0% { width: 0; height: 0; opacity: 0.65; }
+      100% { width: 260px; height: 260px; opacity: 0; }
+    }
+
+    @keyframes drift {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(0, -12px, 0) scale(1.05); }
+    }
+
+    @keyframes floatCard {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @media (max-width: 1080px) {
+      .hero,
+      .band-inner,
+      .section-head,
+      .mini-body {
+        grid-template-columns: 1fr;
+      }
+
+      .mini-body { min-height: auto; }
+      .preview-grid,
+      .grid-3,
+      .hero-metrics,
+      .mini-grid,
+      .mini-surface-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section-head { align-items: start; }
+    }
+
+    @media (max-width: 760px) {
+      .topbar { flex-direction: column; align-items: stretch; }
+      .top-actions { justify-content: space-between; }
+      .hero h2 { max-width: none; }
+      .preview-grid,
+      .grid-3,
+      .hero-metrics,
+      .mini-grid,
+      .mini-surface-grid { grid-template-columns: 1fr; }
+      .hero-actions,
+      .cta-actions { flex-direction: column; align-items: stretch; }
+      .btn,
+      .btn-secondary,
+      .btn-ghost { width: 100%; }
+      .hero { padding-top: 28px; }
+      .band-inner,
+      .cta { padding: 22px; }
+      .hero-glow,
+      .hero-orbit { display: none; }
+      .motion-strip { padding-bottom: 20px; }
+      .motion-track { animation-duration: 16s; }
+      .story-track { grid-auto-columns: 94%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .showcase,
+      .motion-track,
+      .aurora,
+      .cursor-trail,
+      .hero-glow,
+      .hero-orbit,
+      .orbit,
+      .reveal-item {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+      }
+
+      .reveal-item {
+        opacity: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora"></div>
+  <div class="cursor-trail primary" aria-hidden="true"></div>
+  <div class="cursor-trail secondary" aria-hidden="true"></div>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-badge">SS</div>
+        <div class="brand-copy">
+          <h1>SynergySphere</h1>
+          <p>One command center for projects, teams, and delivery.</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <a class="btn-ghost" href="/index.html">Login</a>
+        <a class="btn" href="/index.html">Start Now</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-glow one"></div>
+      <div class="hero-glow two"></div>
+      <div class="hero-orbit a"></div>
+      <div class="hero-orbit b"></div>
+
+      <div>
+        <div class="eyebrow">Built for fast-moving teams</div>
+        <h2>Where <span class="word-rotator"><span>planning</span><span>tracking</span><span>delivery</span></span> feels alive.</h2>
+        <p>
+          SynergySphere turns projects, tasks, deadlines, and team visibility into one beautifully coordinated workspace.
+          Managers assign with confidence, developers stay focused, and everyone sees what matters next.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn" href="/index.html">Enter the workspace</a>
+          <a class="btn-secondary" href="#features">Explore features</a>
+        </div>
+
+        <div class="hero-metrics">
+          <div class="metric">
+            <strong>Live</strong>
+            <span>Progress views, workload signals, and urgent deadlines updated in real time.</span>
+          </div>
+          <div class="metric">
+            <strong>Clear</strong>
+            <span>Separate views for managers, developers, and project workspace control.</span>
+          </div>
+          <div class="metric">
+            <strong>Fast</strong>
+            <span>Move from landing to login to dashboard with a clean, low-friction flow.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="showcase">
+        <div class="mini-window">
+          <div class="mini-bar">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+            <div class="mini-url">synergysphere.local / workspace-preview</div>
+          </div>
+
+          <div class="mini-body">
+            <aside class="mini-side">
+              <div class="mini-brand">
+                <div class="mini-badge">SS</div>
+                <div>
+                  <div style="color:#fff;font-weight:900;letter-spacing:-0.03em;">SynergySphere</div>
+                  <div style="color:rgba(255,255,255,0.35);font-size:0.72rem;margin-top:2px;">Connected workspaces</div>
+                </div>
+              </div>
+              <div class="mini-nav">
+                <div class="active"><span class="mini-dot"></span> Dashboard</div>
+                <div><span class="mini-dot"></span> Projects</div>
+                <div><span class="mini-dot"></span> Tasks</div>
+                <div><span class="mini-dot"></span> Team</div>
+                <div><span class="mini-dot"></span> My Day</div>
+              </div>
+            </aside>
+
+            <main class="mini-main">
+              <div class="mini-header">
+                <div>
+                  <div class="mini-title">Workspace Dashboard</div>
+                  <div class="mini-sub">A live snapshot of project health and delivery.</div>
+                </div>
+                <div style="padding:10px 14px;border-radius:14px;background:rgba(91,87,245,0.18);color:#dcd9ff;font-size:0.76rem;font-weight:800;">Manager View</div>
+              </div>
+
+              <div class="mini-grid">
+                <div class="mini-card"><strong>12</strong><span>Tracked tasks</span></div>
+                <div class="mini-card"><strong>4</strong><span>Active projects</span></div>
+                <div class="mini-card"><strong>2</strong><span>Urgent risks</span></div>
+                <div class="mini-card"><strong>91%</strong><span>Delivery health</span></div>
+              </div>
+
+              <div class="mini-surface-grid">
+                <div class="mini-task">
+                  <h4>Project workspace</h4>
+                  <p>Assign developers, view availability, and keep work tied to the project.
+                  </p>
+                  <div class="mini-progress"><div style="width:78%"></div></div>
+                </div>
+                <div class="mini-task">
+                  <h4>Task monitor</h4>
+                  <p>See overdue, stale, and due-soon tasks without asking for status updates.</p>
+                  <div class="mini-progress"><div style="width:56%; background:linear-gradient(90deg,#00c2ff,#17b26a)"></div></div>
+                </div>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="motion-strip">
+      <div class="motion-track">
+        <span class="motion-pill">Live Workload Signals</span>
+        <span class="motion-pill">Manager Task Monitor</span>
+        <span class="motion-pill">Developer-Only Assignment Pool</span>
+        <span class="motion-pill">Deadline-Aware My Day</span>
+        <span class="motion-pill">Project Health Radar</span>
+        <span class="motion-pill">Role-Based Workspaces</span>
+        <span class="motion-pill">Context-Rich Task Purpose</span>
+        <span class="motion-pill">Real-Time Activity Timeline</span>
+        <span class="motion-pill">Live Workload Signals</span>
+        <span class="motion-pill">Manager Task Monitor</span>
+        <span class="motion-pill">Developer-Only Assignment Pool</span>
+        <span class="motion-pill">Deadline-Aware My Day</span>
+      </div>
+    </section>
+
+    <section class="story-cinema" id="story">
+      <div class="story-head">
+        <div class="section-kicker">Story Mode</div>
+        <h3>Cinematic flow from idea to delivery.</h3>
+        <p>Swipe or scroll through the narrative sequence to experience how teams move through SynergySphere in reality.</p>
+      </div>
+
+      <div class="story-track">
+        <article class="story-panel one interactive-pop">
+          <div class="story-content">
+            <div class="story-step">Scene 01</div>
+            <h4>Kickoff with complete project clarity.</h4>
+            <p>Managers launch the workspace, define outcomes, and instantly see developer assignment capacity with deadline signals.</p>
+            <div class="story-chips">
+              <span class="story-chip">Project workspace</span>
+              <span class="story-chip">Developer availability</span>
+              <span class="story-chip">Risk-aware assignment</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="story-panel two interactive-pop">
+          <div class="story-content">
+            <div class="story-step">Scene 02</div>
+            <h4>Execution with contextual collaboration.</h4>
+            <p>Every task carries purpose, timeline, and context chat so developers can move faster without repeated status meetings.</p>
+            <div class="story-chips">
+              <span class="story-chip">Task purpose</span>
+              <span class="story-chip">Context chat</span>
+              <span class="story-chip">Deadline focus</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="story-panel three interactive-pop">
+          <div class="story-content">
+            <div class="story-step">Scene 03</div>
+            <h4>Monitoring that feels live, not static.</h4>
+            <p>Workload, stale progress, overdue items, and activity signals turn project monitoring into a real-time control surface.</p>
+            <div class="story-chips">
+              <span class="story-chip">Manager monitor</span>
+              <span class="story-chip">Health scoring</span>
+              <span class="story-chip">Actionable signals</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="band-inner">
+        <div class="band-copy">
+          <h3>Designed to feel premium, calm, and sharp.</h3>
+          <p>
+            The interface uses glassy surfaces, luminous gradients, soft depth, and compact motion to give the app a polished first impression without losing clarity.
+          </p>
+          <div class="tag-row">
+            <span class="tag">Animated hero</span>
+            <span class="tag">Modern gradients</span>
+            <span class="tag">Role-aware flows</span>
+            <span class="tag">Manager-first clarity</span>
+          </div>
+        </div>
+        <div class="band-points">
+          <div class="point">
+            <div style="font-weight:900;font-size:1.2rem;">01</div>
+            <div><b>Managers assign faster</b><span>Project workspace and task creation stay central.</span></div>
+          </div>
+          <div class="point">
+            <div style="font-weight:900;font-size:1.2rem;">02</div>
+            <div><b>Developers see purpose</b><span>Every task includes context, deadlines, and urgency.</span></div>
+          </div>
+          <div class="point">
+            <div style="font-weight:900;font-size:1.2rem;">03</div>
+            <div><b>Progress is visible</b><span>Health, workload, and task movement stay easy to scan.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">Why it stands out</div>
+          <h3>Built for a wow first impression.</h3>
+          <p class="lead">The landing page should feel like the product you’re about to enter: modern, energetic, and immediately clear about what the app does.</p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <div class="icon">UI</div>
+          <h4>Expressive visual system</h4>
+          <p>Deep gradients, layered cards, and subtle motion create a premium feel without sacrificing readability.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:linear-gradient(135deg,#00c2ff,#17b26a);">PM</div>
+          <h4>Manager-led workflow</h4>
+          <p>The landing introduces the role split clearly so managers understand project control and monitoring instantly.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:linear-gradient(135deg,#ff7a59,#7c3aed);">DX</div>
+          <h4>Developer-friendly context</h4>
+          <p>From login into the dashboard, the app keeps task purpose, urgency, and progress visible for every developer.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">Flow</div>
+          <h3>Three steps from landing to delivery.</h3>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="step">
+          <div class="step-index">1</div>
+          <div>
+            <h5>Start on the landing page</h5>
+            <p>See the value proposition, the polished preview, and the main CTA before entering the product.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-index">2</div>
+          <div>
+            <h5>Sign in or create an account</h5>
+            <p>Use the login page for role-based access, with separate developer and manager experiences.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-index">3</div>
+          <div>
+            <h5>Move into the workspace</h5>
+            <p>Managers assign and monitor work while developers see their tasks, urgency, and context clearly.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-panel">
+      <div class="cta">
+        <div class="orbit one"></div>
+        <div class="orbit two"></div>
+        <div style="position:relative;z-index:1;">
+          <h3>Ready to step into SynergySphere?</h3>
+          <p>Enter the login page to access the workspace, or stay here a moment longer and take in the interface first.</p>
+          <div class="cta-actions">
+            <a class="btn" href="/index.html">Go to Login</a>
+            <a class="btn-secondary" href="#features">Review features</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const revealTargets = [
+        ...document.querySelectorAll('.band-inner, .card, .step, .cta, .point, .hero-metrics .metric, .story-panel, .story-head')
+      ];
+
+      revealTargets.forEach((element, index) => {
+        element.classList.add('reveal-item');
+        element.style.setProperty('--reveal-delay', `${Math.min(index * 55, 420)}ms`);
+      });
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.16, rootMargin: '0px 0px -30px 0px' });
+
+      revealTargets.forEach((element) => observer.observe(element));
+
+      const hero = document.querySelector('.hero');
+      const showcase = document.querySelector('.showcase');
+      const glows = document.querySelectorAll('.hero-glow');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (hero && showcase && window.matchMedia('(pointer:fine)').matches && !reducedMotion) {
+        hero.addEventListener('pointermove', (event) => {
+          const rect = hero.getBoundingClientRect();
+          const x = (event.clientX - rect.left) / rect.width - 0.5;
+          const y = (event.clientY - rect.top) / rect.height - 0.5;
+
+          showcase.style.setProperty('--ry', `${x * 8}deg`);
+          showcase.style.setProperty('--rx', `${y * -7}deg`);
+
+          glows.forEach((glow, index) => {
+            const factor = index === 0 ? 18 : -14;
+            glow.style.setProperty('--gx', `${x * factor}px`);
+            glow.style.setProperty('--gy', `${y * factor}px`);
+          });
+        });
+
+        hero.addEventListener('pointerleave', () => {
+          showcase.style.setProperty('--ry', '0deg');
+          showcase.style.setProperty('--rx', '0deg');
+          glows.forEach((glow) => {
+            glow.style.setProperty('--gx', '0px');
+            glow.style.setProperty('--gy', '0px');
+          });
+        });
+      }
+
+      const interactiveNodes = [
+        ...document.querySelectorAll('.btn, .btn-secondary, .btn-ghost, .card, .step, .point, .motion-pill, .story-panel')
+      ];
+
+      interactiveNodes.forEach((node) => {
+        node.classList.add('interactive-pop');
+        node.addEventListener('pointerdown', (event) => {
+          if (reducedMotion) return;
+          const rect = node.getBoundingClientRect();
+          const ripple = document.createElement('span');
+          ripple.className = 'ripple';
+          ripple.style.left = `${event.clientX - rect.left}px`;
+          ripple.style.top = `${event.clientY - rect.top}px`;
+          node.appendChild(ripple);
+          window.setTimeout(() => ripple.remove(), 620);
+        });
+      });
+
+      const primaryTrail = document.querySelector('.cursor-trail.primary');
+      const secondaryTrail = document.querySelector('.cursor-trail.secondary');
+
+      if (primaryTrail && secondaryTrail && window.matchMedia('(pointer:fine)').matches && !reducedMotion) {
+        const point = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        const t1 = { x: point.x, y: point.y };
+        const t2 = { x: point.x, y: point.y };
+
+        const tick = () => {
+          t1.x += (point.x - t1.x) * 0.2;
+          t1.y += (point.y - t1.y) * 0.2;
+          t2.x += (point.x - t2.x) * 0.12;
+          t2.y += (point.y - t2.y) * 0.12;
+
+          primaryTrail.style.transform = `translate(${t1.x - 120}px, ${t1.y - 120}px)`;
+          secondaryTrail.style.transform = `translate(${t2.x - 85}px, ${t2.y - 85}px)`;
+
+          requestAnimationFrame(tick);
+        };
+
+        window.addEventListener('pointermove', (event) => {
+          point.x = event.clientX;
+          point.y = event.clientY;
+          primaryTrail.style.opacity = '1';
+          secondaryTrail.style.opacity = '0.95';
+        });
+
+        window.addEventListener('pointerleave', () => {
+          primaryTrail.style.opacity = '0';
+          secondaryTrail.style.opacity = '0';
+        });
+
+        tick();
+      }
+    })();
+  </script>
+</body>
+</html>
