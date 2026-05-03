@@ -41,7 +41,7 @@
       <header class="topbar">
         <div>
           <h2 class="page-title">My Day</h2>
-          <p class="page-subtitle">Focus on the tasks that are overdue, due today, or coming up next.</p>
+          <p class="page-subtitle" id="page-subtitle">Focus on the tasks that are overdue, due today, or coming up next.</p>
         </div>
         <div class="topbar-actions">
           <div class="user-chip" id="topbar-user"></div>
@@ -49,7 +49,7 @@
       </header>
 
       <section class="content">
-        <div class="list" id="task-list"></div>
+        <div id="myday-root"></div>
       </section>
     </main>
   </div>
@@ -59,10 +59,15 @@
     if (!requireAuth()) throw new Error('auth required');
 
     const user = getUser();
+    const isManager = canManageWorkspace();
     document.getElementById('sidebar-avatar').textContent = initials(user.name);
     document.getElementById('sidebar-name').textContent = user.name;
     document.getElementById('sidebar-role').textContent = user.title || 'Sign out';
     document.getElementById('topbar-user').innerHTML = `${avatarHtml(user.name, user.avatarColor, 'sm')}<div><div class="name">${escapeHtml(user.name)}</div><div class="role">${escapeHtml(user.title || 'Member')}</div></div>`;
+
+    document.getElementById('page-subtitle').textContent = isManager
+      ? 'Track project risk, overdue work, and the follow-ups that keep delivery moving.'
+      : 'Focus on the tasks that are overdue, due today, or coming up next.';
 
     function flattenDay(data) {
       return [
@@ -72,13 +77,169 @@
       ];
     }
 
+    function taskSeverity(task) {
+      if (task.overdue) return 0;
+      if (task.stale) return 1;
+      if (task.dueSoon) return 2;
+      if (task.priority === 'high') return 3;
+      if (task.priority === 'medium') return 4;
+      return 5;
+    }
+
+    function sortManagerTasks(tasks) {
+      return [...tasks].sort((a, b) => {
+        const severity = taskSeverity(a) - taskSeverity(b);
+        if (severity !== 0) return severity;
+        const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+        if (aDue !== bDue) return aDue - bDue;
+        return String(a.title || '').localeCompare(String(b.title || ''));
+      });
+    }
+
+    function groupManagerProjects(tasks) {
+      const map = new Map();
+
+      for (const task of tasks) {
+        const project = task.project || {};
+        const key = project._id || project.id || project.name || 'unknown';
+        if (!map.has(key)) {
+          map.set(key, {
+            _id: project._id || project.id || key,
+            name: project.name || 'Project',
+            color: project.color || '#5b57f5',
+            tasks: [],
+            active: 0,
+            overdue: 0,
+            dueSoon: 0,
+            stale: 0,
+            unassigned: 0,
+          });
+        }
+
+        const entry = map.get(key);
+        entry.tasks.push(task);
+        if (task.status !== 'done') entry.active += 1;
+        if (task.overdue) entry.overdue += 1;
+        if (task.dueSoon) entry.dueSoon += 1;
+        if (task.stale) entry.stale += 1;
+        if (!task.assignee) entry.unassigned += 1;
+      }
+
+      return Array.from(map.values()).sort((a, b) => {
+        const riskA = a.overdue + a.stale + a.dueSoon;
+        const riskB = b.overdue + b.stale + b.dueSoon;
+        if (riskA !== riskB) return riskB - riskA;
+        return b.active - a.active;
+      });
+    }
+
+    function groupManagerAssignees(tasks) {
+      const map = new Map();
+
+      for (const task of tasks) {
+        const assignee = task.assignee;
+        if (!assignee) continue;
+
+        const key = assignee._id || assignee.id || assignee.name;
+        if (!map.has(key)) {
+          map.set(key, {
+            _id: assignee._id || assignee.id || key,
+            name: assignee.name || 'Unassigned',
+            avatarColor: assignee.avatarColor || '#5b57f5',
+            title: assignee.title || 'Member',
+            active: 0,
+            overdue: 0,
+            dueSoon: 0,
+            projects: new Set(),
+          });
+        }
+
+        const entry = map.get(key);
+        if (task.status !== 'done') entry.active += 1;
+        if (task.overdue) entry.overdue += 1;
+        if (task.dueSoon) entry.dueSoon += 1;
+        if (task.project?.name) entry.projects.add(task.project.name);
+      }
+
+      return Array.from(map.values()).sort((a, b) => {
+        const riskA = a.overdue + a.dueSoon;
+        const riskB = b.overdue + b.dueSoon;
+        if (riskA !== riskB) return riskB - riskA;
+        if (a.active !== b.active) return b.active - a.active;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    function buildManagerActions(summary, projectGroups, assignees, unreadCount) {
+      const actions = [];
+
+      if (summary.overdue > 0) {
+        actions.push({
+          title: 'Clear overdue work',
+          copy: `${summary.overdue} task${summary.overdue === 1 ? '' : 's'} need immediate attention.`,
+          cta: 'Open Tasks',
+          href: '/tasks.html',
+        });
+      }
+
+      if (summary.stale > 0) {
+        actions.push({
+          title: 'Unblock stale tasks',
+          copy: `${summary.stale} in-progress task${summary.stale === 1 ? '' : 's'} have not moved recently.`,
+          cta: 'Review Projects',
+          href: '/projects.html',
+        });
+      }
+
+      if (summary.unassigned > 0) {
+        actions.push({
+          title: 'Assign open tasks',
+          copy: `${summary.unassigned} task${summary.unassigned === 1 ? '' : 's'} are still waiting for an owner.`,
+          cta: 'Open Tasks',
+          href: '/tasks.html',
+        });
+      }
+
+      if (projectGroups.some((project) => project.overdue + project.stale + project.dueSoon >= 3)) {
+        const project = projectGroups.find((item) => item.overdue + item.stale + item.dueSoon >= 3);
+        actions.push({
+          title: `Review ${project.name}`,
+          copy: 'This project is carrying the highest concentration of delivery risk.',
+          cta: 'Open Project',
+          href: `/project.html?id=${project._id}`,
+        });
+      }
+
+      if (assignees.some((member) => member.overdue >= 2 || member.active >= 5)) {
+        const member = assignees.find((item) => item.overdue >= 2 || item.active >= 5);
+        actions.push({
+          title: `Check on ${member.name}`,
+          copy: `${member.active} active task${member.active === 1 ? '' : 's'} with ${member.overdue} overdue.`,
+          cta: 'Open Team',
+          href: '/team.html',
+        });
+      }
+
+      if (unreadCount > 0) {
+        actions.push({
+          title: 'Review new notifications',
+          copy: `${unreadCount} unread update${unreadCount === 1 ? '' : 's'} may need a decision.`,
+          cta: 'Open Dashboard',
+          href: '/dashboard.html',
+        });
+      }
+
+      return actions.slice(0, 4);
+    }
+
     function renderDay(items) {
       if (!items.length) {
-        document.getElementById('task-list').innerHTML = '<div class="empty">You are all caught up today.</div>';
+        document.getElementById('myday-root').innerHTML = '<div class="empty">You are all caught up today.</div>';
         return;
       }
 
-      document.getElementById('task-list').innerHTML = items.map((task) => `
+      document.getElementById('myday-root').innerHTML = items.map((task) => `
         <div class="task-row">
           <div>
             <div class="task-title">${escapeHtml(task.title)}</div>
@@ -94,11 +255,180 @@
       `).join('');
     }
 
+    function renderManagerView(data, notes) {
+      const tasks = sortManagerTasks(data.tasks || []);
+      const summary = data.summary || { total: 0, done: 0, active: 0, overdue: 0, stale: 0 };
+      const projectGroups = groupManagerProjects(tasks);
+      const assignees = groupManagerAssignees(tasks);
+      const unreadCount = (notes || []).filter((note) => !note.isRead).length;
+      const dueSoon = tasks.filter((task) => task.dueSoon).length;
+      const atRiskProjects = projectGroups.filter((project) => project.overdue + project.stale + project.dueSoon > 0).length;
+      const unassigned = tasks.filter((task) => !task.assignee).length;
+      const actions = buildManagerActions({ ...summary, dueSoon, unassigned }, projectGroups, assignees, unreadCount);
+
+      document.getElementById('myday-root').innerHTML = `
+        <div class="page-section">
+          <div class="section-header">
+            <div>
+              <h3 class="section-title">Manager Control Room</h3>
+              <p class="section-copy">A live view of project risk, delivery pressure, and the team follow-ups that need a decision today.</p>
+            </div>
+            <a class="btn-soft" href="/dashboard.html">Open Dashboard</a>
+          </div>
+
+          <div class="stats-grid">
+            <article class="stat-card"><div class="stat-icon total">AT</div><div><div class="stat-title">Active Tasks</div><div class="stat-value">${summary.active}</div></div></article>
+            <article class="stat-card"><div class="stat-icon pending">OD</div><div><div class="stat-title">Overdue</div><div class="stat-value">${summary.overdue}</div></div></article>
+            <article class="stat-card"><div class="stat-icon active">DS</div><div><div class="stat-title">Due Soon</div><div class="stat-value">${dueSoon}</div></div></article>
+            <article class="stat-card"><div class="stat-icon completed">ST</div><div><div class="stat-title">Stale</div><div class="stat-value">${summary.stale}</div></div></article>
+            <article class="stat-card"><div class="stat-icon pending">PR</div><div><div class="stat-title">Risk Projects</div><div class="stat-value">${atRiskProjects}</div></div></article>
+            <article class="stat-card"><div class="stat-icon total">UN</div><div><div class="stat-title">Unassigned</div><div class="stat-value">${unassigned}</div></div></article>
+          </div>
+        </div>
+
+        <div class="page-section split-layout">
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Priority Queue</div>
+                  <div class="panel-copy">Overdue, stale, and due-soon work across your owned projects.</div>
+                </div>
+                <a class="btn-soft" href="/tasks.html">Open Tasks</a>
+              </div>
+              <div class="list">
+                ${tasks.length ? tasks.slice(0, 8).map((task) => `
+                  <div class="task-row">
+                    <div>
+                      <div class="task-title">${escapeHtml(task.title)}</div>
+                      <div class="task-sub">${escapeHtml(task.project?.name || 'Project')} · ${escapeHtml(task.assignee?.name || 'Unassigned')} · ${task.dueDate ? fmtDate(task.dueDate) : 'No due date'}</div>
+                      <div class="message-meta" style="margin-top:6px; max-width:760px;">${escapeHtml(task.description || task.project?.description || 'No purpose added for this task yet.')}</div>
+                    </div>
+                    <div>
+                      <span class="pill ${task.overdue ? 'pill-danger' : task.stale ? 'pill-muted' : task.dueSoon ? 'pill-ok' : 'pill-muted'}">${task.overdue ? 'Overdue' : task.stale ? 'Stale' : task.dueSoon ? 'Due Soon' : 'Watch'}</span>
+                    </div>
+                    <div class="meta-text">${escapeHtml(task.priority || 'medium')}</div>
+                    <div class="inline-actions">
+                      <a class="btn-soft" href="/project.html?id=${task.project?._id || ''}">Open Project</a>
+                      <button class="btn-soft" onclick="markDone('${task._id}')">Mark done</button>
+                    </div>
+                  </div>
+                `).join('') : '<div class="empty">No live tasks found in your projects.</div>'}
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Project Radar</div>
+                  <div class="panel-copy">See which projects are carrying the most delivery pressure right now.</div>
+                </div>
+                <span class="pill pill-muted">${projectGroups.length} projects</span>
+              </div>
+              <div class="list">
+                ${projectGroups.length ? projectGroups.slice(0, 5).map((project) => `
+                  <div class="list-row">
+                    <div class="section-header" style="margin-bottom:0;">
+                      <div>
+                        <div class="task-title">${escapeHtml(project.name)}</div>
+                        <div class="task-sub">${project.active} active · ${project.overdue} overdue · ${project.dueSoon} due soon · ${project.stale} stale</div>
+                      </div>
+                      <span class="pill ${project.overdue > 0 ? 'pill-danger' : project.stale > 0 ? 'pill-muted' : 'pill-ok'}">${project.overdue + project.stale + project.dueSoon > 0 ? 'At risk' : 'Healthy'}</span>
+                    </div>
+                    <div class="mini-progress"><div style="width:${Math.min(100, (project.tasks.filter((task) => task.status === 'done').length * 100) / Math.max(project.tasks.length, 1))}%; background:${escapeHtml(project.color || '#5b57f5')}"></div></div>
+                  </div>
+                `).join('') : '<div class="empty">No projects available yet.</div>'}
+              </div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Team Watchlist</div>
+                  <div class="panel-copy">Members carrying the heaviest active load or overdue work.</div>
+                </div>
+                <a class="btn-soft" href="/team.html">Open Team</a>
+              </div>
+              <div class="list">
+                ${assignees.length ? assignees.slice(0, 5).map((member) => `
+                  <div class="list-row">
+                    <div class="avatar-row">
+                      ${avatarHtml(member.name, member.avatarColor, 'sm')}
+                      <div>
+                        <div class="task-title">${escapeHtml(member.name)}</div>
+                        <div class="task-sub">${escapeHtml(member.title || 'Member')} · ${member.projects.size} project${member.projects.size === 1 ? '' : 's'}</div>
+                      </div>
+                    </div>
+                    <div class="meta-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+                      <div class="meta-card"><div class="meta-label">Active</div><div class="meta-value">${member.active}</div></div>
+                      <div class="meta-card"><div class="meta-label">Overdue</div><div class="meta-value">${member.overdue}</div></div>
+                      <div class="meta-card"><div class="meta-label">Due Soon</div><div class="meta-value">${member.dueSoon}</div></div>
+                    </div>
+                  </div>
+                `).join('') : '<div class="empty">No assigned teammates found for these projects.</div>'}
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Today’s Follow-Ups</div>
+                  <div class="panel-copy">Suggested actions based on the current delivery signal.</div>
+                </div>
+              </div>
+              <div class="list">
+                ${actions.length ? actions.map((action) => `
+                  <div class="list-row">
+                    <div>
+                      <div class="task-title">${escapeHtml(action.title)}</div>
+                      <div class="task-sub">${escapeHtml(action.copy)}</div>
+                    </div>
+                    <div class="inline-actions">
+                      <a class="btn-soft" href="${action.href}">${escapeHtml(action.cta)}</a>
+                    </div>
+                  </div>
+                `).join('') : '<div class="empty">No follow-ups needed right now.</div>'}
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="section-header">
+                <div>
+                  <div class="panel-title">Notifications</div>
+                  <div class="panel-copy">Recent alerts from assignments, deadlines, and project updates.</div>
+                </div>
+              </div>
+              <div class="message-list" id="notif-list"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      renderNotifications(notes || []);
+    }
+
     async function loadMyDay() {
-      const data = await api('/myday');
+      if (isManager) {
+        const [taskMonitor, notes] = await Promise.all([
+          api('/projects/manager/task-monitor'),
+          api('/notifications'),
+        ]);
+        renderManagerView(taskMonitor || { tasks: [], summary: { total: 0, done: 0, active: 0, overdue: 0, stale: 0 } }, notes || []);
+        return;
+      }
+
+      const [data, notes] = await Promise.all([
+        api('/myday'),
+        api('/notifications'),
+      ]);
+
       if (data) {
         renderDay(flattenDay(data));
       }
+
+      renderNotifications(notes || []);
     }
 
     async function markDone(id) {
@@ -111,6 +441,33 @@
         showToast('Task updated.', 'success');
         loadMyDay();
       }
+    }
+
+    function renderNotifications(notes) {
+      const list = document.getElementById('notif-list');
+      if (!list) return;
+
+      if (!notes.length) {
+        list.innerHTML = '<div class="empty">No notifications yet. You are up to date.</div>';
+        return;
+      }
+
+      list.innerHTML = notes.slice(0, 5).map((note) => `
+        <div class="message-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">${escapeHtml(note.message)}</div>
+              <div class="message-meta">${timeAgo(note.createdAt)}</div>
+            </div>
+            ${note.isRead ? '<span class="pill pill-muted">Read</span>' : `<button class="btn-soft" onclick="markNotificationRead('${note._id}')">Mark read</button>`}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function markNotificationRead(id) {
+      const updated = await api(`/notifications/${id}/read`, { method: 'PATCH' });
+      if (updated) loadMyDay();
     }
 
     loadMyDay();
