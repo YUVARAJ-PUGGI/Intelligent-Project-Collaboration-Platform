@@ -10,6 +10,7 @@ const {
   normalizePriority,
   normalizeStatus,
 } = require('../services/taskService');
+const { calculateWorkload } = require('../services/workloadService');
 
 async function canAccessProject(projectId, userId) {
   return Project.exists({ _id: projectId, 'members.user': userId });
@@ -193,8 +194,69 @@ async function deleteTask(req, res) {
   }
 }
 
+async function assignTask(req, res) {
+  try {
+    const task = await loadAccessibleTask(req.params.id, req.user._id);
+    if (task === 'forbidden') return res.status(403).json({ message: 'You cannot update this task' });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const developerId = req.body.developerId;
+    if (!developerId) return res.status(400).json({ message: 'developerId is required' });
+
+    const assigneeError = await validateDeveloperAssignee(task.project, developerId);
+    if (assigneeError) return res.status(400).json({ message: assigneeError });
+
+    // workload calculation (hours)
+    const currentLoad = await calculateWorkload(developerId);
+    const taskHours = (task.estimatedHours || 0) || Number(req.body.estimatedHours || 0);
+    const projectedLoad = currentLoad + taskHours;
+    const THRESHOLD = 40;
+
+    const warning = projectedLoad > THRESHOLD ? {
+      message: 'Developer is overloaded',
+      currentLoad,
+      projectedLoad,
+      suggestions: ['Reassign to another developer', 'Extend deadline', 'Split task']
+    } : null;
+
+    const previousAssignee = task.assignee?.toString();
+
+    task.assignee = developerId;
+    task.status = 'inprogress';
+    await task.save();
+
+    if (shouldNotifyAssignee(developerId, previousAssignee, req.user._id.toString())) {
+      await Notification.create({
+        user: developerId,
+        type: 'task_assigned',
+        message: `You were assigned: "${task.title}"`,
+        project: task.project,
+        task: task._id,
+      });
+    }
+
+    await Activity.create({
+      project: task.project,
+      user: req.user._id,
+      action: 'assigned task',
+      entityType: 'task',
+      entityId: task._id,
+      details: task.title,
+    });
+
+    const populatedTask = await Task.findById(task._id)
+      .populate('assignee', 'name email avatarColor title')
+      .populate('createdBy', 'name');
+
+    return res.json({ task: populatedTask, warning });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+}
+
 module.exports = {
   createTask,
   updateTask,
   deleteTask,
+  assignTask,
 };

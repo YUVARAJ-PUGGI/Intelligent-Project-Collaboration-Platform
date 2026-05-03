@@ -14,7 +14,7 @@ function normalizePriority(value) {
 }
 
 function buildTaskPayload(body, userId) {
-  const { project, title, description, assignee, priority, dueDate, status } = body;
+  const { project, title, description, assignee, priority, dueDate, status, estimatedHours } = body;
   return {
     project,
     title,
@@ -23,6 +23,7 @@ function buildTaskPayload(body, userId) {
     priority: normalizePriority(priority),
     dueDate: dueDate || null,
     status: normalizeStatus(status),
+    estimatedHours: typeof estimatedHours !== 'undefined' ? Number(estimatedHours) || 0 : 0,
     createdBy: userId,
   };
 }

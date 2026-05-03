@@ -17,7 +17,13 @@ const taskSchema = new mongoose.Schema({
     default: 'medium'
   },
   dueDate: { type: Date },
+  // estimated effort in hours (used for workload calculations)
+  estimatedHours: { type: Number, default: 0, min: 0 },
   tags: [{ type: String }],
 }, { timestamps: true });
+
+// index common query fields for performance
+taskSchema.index({ assignee: 1 });
+taskSchema.index({ project: 1 });
 
 module.exports = mongoose.model('Task', taskSchema);

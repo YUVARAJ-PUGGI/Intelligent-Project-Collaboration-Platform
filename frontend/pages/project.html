@@ -126,6 +126,7 @@
           <div class="form-row">
             <label class="form-label" for="task-assignee">Assignee</label>
             <select id="task-assignee"></select>
+            <div id="assignee-workload" style="margin-top:6px; font-size:0.9rem; color:#666"></div>
           </div>
           <div class="form-row">
             <label class="form-label" for="task-status">Status</label>
@@ -156,6 +157,10 @@
           <div class="form-row">
             <label class="form-label" for="task-due">Due date</label>
             <input id="task-due" type="date">
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="task-estimate">Estimated hours</label>
+            <input id="task-estimate" type="number" min="0" step="0.5" placeholder="0">
           </div>
         </div>
         <div class="modal-actions">
@@ -238,6 +243,27 @@
       }
 
       document.getElementById('task-assignee').innerHTML = options.join('');
+      renderAssigneeWorkload(selectedId);
+    }
+
+    function renderAssigneeWorkload(selectedId) {
+      const el = document.getElementById('assignee-workload');
+      if (!el) return;
+      if (!selectedId) {
+        el.textContent = '';
+        return;
+      }
+
+      const entry = workload.find((w) => w.user._id === selectedId || w.user._id === selectedId.toString());
+      if (!entry) {
+        el.textContent = 'No workload data available for this developer.';
+        return;
+      }
+
+      const status = entry.availability || 'light';
+      const color = status === 'free' || status === 'light' ? '#117a37' : status === 'busy' ? '#b8860b' : '#b00020';
+      el.style.color = color;
+      el.textContent = `Current load: ${entry.active} active, ${entry.urgent12h || 0} due soon — ${status.toUpperCase()}`;
     }
 
     function formatAssignmentWarning(check) {
@@ -284,6 +310,7 @@
       document.getElementById('task-status').value = task?.status || 'todo';
       document.getElementById('task-priority').value = task?.priority || 'medium';
       document.getElementById('task-due').value = task?.dueDate ? task.dueDate.substring(0, 10) : '';
+      document.getElementById('task-estimate').value = (task && task.estimatedHours) ? task.estimatedHours : '';
 
       ['task-assignee', 'task-title', 'task-desc', 'task-priority', 'task-due'].forEach((idAttr) => {
         document.getElementById(idAttr).disabled = !isManager;
@@ -293,6 +320,8 @@
         selectedTaskId = task._id;
         loadTaskMessages(task._id);
       }
+
+      document.getElementById('task-assignee').addEventListener('change', (e) => renderAssigneeWorkload(e.target.value));
 
       document.getElementById('modal-task').classList.add('open');
     }
@@ -340,7 +369,7 @@
             <div class="task-sub">${escapeHtml(task.assignee?.name || 'Unassigned')} - ${task.dueDate ? fmtDate(task.dueDate) : 'No due date'}</div>
           </div>
           <div><span class="badge ${task.status === 'done' ? 'done' : task.status === 'inprogress' ? 'progress' : 'todo'}">${task.status === 'inprogress' ? 'In Progress' : task.status === 'done' ? 'Done' : 'To Do'}</span></div>
-          <div class="meta-text">${escapeHtml(task.priority)}</div>
+          <div class="meta-text">${escapeHtml(task.priority)} • ${escapeHtml(String(task.estimatedHours || 0))}h</div>
           <div class="inline-actions">
             <button class="btn-soft" onclick="event.stopPropagation(); quickDone('${task._id}')">Mark done</button>
           </div>
@@ -497,6 +526,7 @@
             status: document.getElementById('task-status').value,
             priority: document.getElementById('task-priority').value,
             dueDate: document.getElementById('task-due').value || null,
+            estimatedHours: Number(document.getElementById('task-estimate').value) || 0,
           }
         : {
             status: document.getElementById('task-status').value,
