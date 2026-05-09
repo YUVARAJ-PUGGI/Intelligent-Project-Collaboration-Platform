@@ -295,6 +295,16 @@ function priorityWeight(priority) {
   return 20;
 }
 
+function compareLoad(a, b) {
+  if (a.activeTasks !== b.activeTasks) return a.activeTasks - b.activeTasks;
+  if (a.urgentTasks !== b.urgentTasks) return a.urgentTasks - b.urgentTasks;
+  return a.highPriorityDueSoon - b.highPriorityDueSoon;
+}
+
+function isStrictlyLowerLoad(candidate, baseline) {
+  return compareLoad(candidate, baseline) < 0;
+}
+
 async function checkAssignmentRisk(req, res) {
   try {
     const project = await Project.findOne(projectMemberQuery(req.params.id, req.user._id))
@@ -383,18 +393,11 @@ async function checkAssignmentRisk(req, res) {
           };
           return { member, load };
         })
-        .sort((a, b) => {
-          if (a.load.activeTasks !== b.load.activeTasks) {
-            return a.load.activeTasks - b.load.activeTasks;
-          }
-          if (a.load.urgentTasks !== b.load.urgentTasks) {
-            return a.load.urgentTasks - b.load.urgentTasks;
-          }
-          return a.load.highPriorityDueSoon - b.load.highPriorityDueSoon;
-        });
+        .sort((a, b) => compareLoad(a.load, b.load));
 
-      if (alternatives.length) {
-        alternative = alternatives[0];
+      const lowerLoadAlternatives = alternatives.filter((entry) => isStrictlyLowerLoad(entry.load, assigneeLoad));
+      if (lowerLoadAlternatives.length) {
+        alternative = lowerLoadAlternatives[0];
       }
     }
 
@@ -405,7 +408,7 @@ async function checkAssignmentRisk(req, res) {
       } else if (alternative) {
         recommendation = `${baseWarning} Suggest a ${suggestedExtensionHours}h extension or reassigning to ${alternative.member.user.name} (${alternative.load.activeTasks} active tasks).`;
       } else {
-        recommendation = `${baseWarning} Suggest a ${suggestedExtensionHours}h extension to avoid a delivery bottleneck.`;
+        recommendation = `${baseWarning} No lower-workload alternative is available right now, so suggest a ${suggestedExtensionHours}h extension to avoid a delivery bottleneck.`;
       }
     }
 
