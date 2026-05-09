@@ -7,6 +7,7 @@
 
 const Decision = require('../models/Decision');
 const Message = require('../models/Message');
+const mongoose = require('mongoose');
 
 const DecisionTrackingService = {
   /**
@@ -245,7 +246,7 @@ const DecisionTrackingService = {
   async getDecisionSummary(taskId) {
     try {
       const summary = await Decision.aggregate([
-        { $match: { task: require('mongoose').Types.ObjectId(taskId) } },
+        { $match: { task: new mongoose.Types.ObjectId(taskId) } },
         { $group: { _id: '$decisionType', count: { $sum: 1 } } },
       ]);
 

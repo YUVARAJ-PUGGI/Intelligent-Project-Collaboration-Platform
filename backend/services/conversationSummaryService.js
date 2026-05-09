@@ -43,8 +43,18 @@ const ConversationSummaryService = {
         timestamp: msg.createdAt,
       }));
 
-      // Generate summary using AI
-      const summaryData = await AIService.generateConversationSummary(formattedMessages);
+      // Load task details so AI can include task context
+      const task = await Task.findById(taskId);
+      if (!task) {
+        return await this.createEmptySummary(taskId);
+      }
+
+      // Generate summary using AI (include task context)
+      const summaryData = await AIService.generateConversationSummary(formattedMessages, {
+        taskTitle: task.title,
+        taskStatus: task.status,
+        taskPriority: task.priority,
+      });
 
       // Find or create summary document
       let summary = await ConversationSummary.findOne({ task: taskId });

@@ -9,6 +9,15 @@ const Message = require('../models/Message');
 const SearchIndex = require('../models/SearchIndex');
 const Task = require('../models/Task');
 const AIService = require('./aiService');
+const mongoose = require('mongoose');
+
+function toObjectId(value, label) {
+  if (!mongoose.isValidObjectId(value)) {
+    throw new Error(`Invalid ${label}`);
+  }
+
+  return new mongoose.Types.ObjectId(value);
+}
 
 const SemanticSearchService = {
   /**
@@ -73,7 +82,7 @@ const SemanticSearchService = {
 
       // For semantic search, use full-text search combined with keyword matching
       const searchQuery = {
-        task: require('mongoose').Types.ObjectId(taskId),
+        task: toObjectId(taskId, 'task ID'),
       };
 
       if (entityType) {
@@ -128,7 +137,7 @@ const SemanticSearchService = {
       const { limit = 10, entityType = null } = options;
 
       const query = {
-        task: require('mongoose').Types.ObjectId(taskId),
+        task: toObjectId(taskId, 'task ID'),
         keywords: keyword.toLowerCase(),
       };
 
@@ -157,7 +166,7 @@ const SemanticSearchService = {
   async findErrorLogs(taskId) {
     try {
       const errors = await SearchIndex.find({
-        task: require('mongoose').Types.ObjectId(taskId),
+        task: toObjectId(taskId, 'task ID'),
         entityType: 'error_log',
       })
         .populate('message', 'content sender createdAt')
@@ -180,7 +189,7 @@ const SemanticSearchService = {
   async findCodeSnippets(taskId, language = null) {
     try {
       const query = {
-        task: require('mongoose').Types.ObjectId(taskId),
+        task: toObjectId(taskId, 'task ID'),
         entityType: 'code_snippet',
       };
 
@@ -212,7 +221,7 @@ const SemanticSearchService = {
       const { limit = 20, entityType = null } = options;
 
       const searchQuery = {
-        project: require('mongoose').Types.ObjectId(projectId),
+        project: toObjectId(projectId, 'project ID'),
       };
 
       if (entityType) {
@@ -256,7 +265,7 @@ const SemanticSearchService = {
 
       const query = {};
       if (taskId) {
-        query.task = require('mongoose').Types.ObjectId(taskId);
+        query.task = toObjectId(taskId, 'task ID');
       }
 
       // Find messages with similar keywords

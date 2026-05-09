@@ -1,4 +1,5 @@
 const Task = require('../models/Task');
+const mongoose = require('mongoose');
 
 /**
  * calculateWorkload(developerId)
@@ -11,7 +12,7 @@ async function calculateWorkload(developerId) {
   const result = await Task.aggregate([
     {
       $match: {
-        assignee: require('mongoose').Types.ObjectId(developerId),
+        assignee: new mongoose.Types.ObjectId(developerId),
         status: { $in: ['todo', 'inprogress'] },
       },
     },

@@ -54,7 +54,7 @@
           <div class="stats-grid" id="project-stats"></div>
         </div>
 
-        <div class="page-section split-layout">
+        <div class="page-section split-layout" id="project-main-layout">
           <div class="stack">
             <div class="panel">
               <div class="section-header">
@@ -67,22 +67,59 @@
               <div class="list" id="task-list"></div>
             </div>
 
-            <div class="panel">
-              <div class="section-header">
+            <div class="panel task-context-panel" id="task-context-panel-main">
+              <div class="section-header task-context-topbar">
                 <div>
                   <div class="panel-title">Task Context Chat</div>
-                  <div class="panel-copy">Select a task, then keep all technical discussion tied to that task.</div>
+                  <div class="panel-copy">Select a task, chat normally, and let AI turn that conversation into a summary, decisions, and searchable context.</div>
+                </div>
+                <div class="task-context-meta">
+                  <select id="task-context-select" onchange="selectTaskContext(this.value)"></select>
+                  <span class="pill pill-muted" id="task-context-status">No task selected</span>
+                  <button type="button" class="btn-icon" id="task-expand-btn" onclick="toggleTaskContextExpand()">⤢</button>
                 </div>
               </div>
-              <form onsubmit="sendMessage(event)">
-                <div class="form-row">
-                  <textarea id="message-input" placeholder="Share blockers, decisions, and logs for the selected task."></textarea>
+
+              <div class="selected-task-banner" id="selected-task-banner">
+                <div class="empty selected-task-empty">Choose a task to see its assignee, due date, blockers, and decisions.</div>
+              </div>
+
+              <div class="task-context-workspace">
+                <div class="task-context-chat">
+                  <div class="section-header compact-header">
+                    <div>
+                      <div class="panel-title" style="font-size:1rem;">Conversation</div>
+                      <div class="panel-copy" style="margin-top:4px;">Developers can talk naturally here. The AI reads the task chat and extracts the important points automatically.</div>
+                    </div>
+                  </div>
+
+                  <form onsubmit="sendMessage(event)">
+                    <div class="form-row">
+                      <textarea id="message-input" placeholder="Write updates, questions, blockers, fixes, or ideas for this task..." oninput="updateTaskContextSuggestions(this.value)"></textarea>
+                    </div>
+                    <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
+                      <button type="submit" class="action-btn">Post Comment</button>
+                    </div>
+                  </form>
+                  <div class="context-suggestions" id="task-context-suggestions"></div>
+                  <div class="message-list task-context-scroll" id="message-list"></div>
                 </div>
-                <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
-                  <button type="submit" class="action-btn">Post Comment</button>
+
+                <div class="task-context-ai">
+                  <div class="ai-tools-panel ai-tools-compact">
+                    <div class="ai-tools-header">
+                      <div>
+                        <div class="panel-title" style="font-size:1rem;">Task Intelligence</div>
+                        <div class="panel-copy" style="margin-top:4px;">This panel turns the task chat into a readable summary of what was discussed, what was decided, what is still open, and how far the task has progressed.</div>
+                      </div>
+                    </div>
+
+                    <div class="ai-tools-body task-context-scroll" id="task-ai-body">
+                      <div class="empty">Choose a task to view intelligent discussion tools.</div>
+                    </div>
+                  </div>
                 </div>
-              </form>
-              <div class="message-list" id="message-list" style="margin-top:18px;"></div>
+              </div>
             </div>
 
             <div class="panel">
@@ -263,6 +300,9 @@
     let health = { level: 'green', score: 0 };
     let selectedTaskId = '';
     let pendingTaskSubmission = null;
+    let taskAiView = 'summary';
+    let taskAiCache = { summary: null, decisions: null, search: null };
+    let taskSearchQuery = 'jwt issue';
 
     function currentUserId() {
       return String(user.id || user._id || '');
@@ -271,6 +311,269 @@
     function isMyTask(task) {
       const assigneeId = task?.assignee?._id || task?.assignee?.id || task?.assignee;
       return String(assigneeId || '') === currentUserId();
+    }
+
+    function getSelectedTask() {
+      return tasks.find((task) => String(task._id) === String(selectedTaskId)) || null;
+    }
+
+    function updateTaskContextStatus() {
+      const status = document.getElementById('task-context-status');
+      const task = getSelectedTask();
+      const select = document.getElementById('task-context-select');
+
+      if (!status || !select) return;
+
+      if (!task) {
+        status.textContent = 'No task selected';
+        select.value = '';
+        return;
+      }
+
+      const owner = task.assignee?.name || 'Unassigned';
+      status.textContent = `${task.projectName || 'Project'} • ${owner}`;
+      if (select.value !== task._id) select.value = task._id;
+    }
+
+    function updateSelectedTaskBanner() {
+      const banner = document.getElementById('selected-task-banner');
+      const task = getSelectedTask();
+
+      if (!banner) return;
+
+      if (!task) {
+        banner.innerHTML = '<div class="empty selected-task-empty">Choose a task to see its assignee, due date, blockers, and decisions.</div>';
+        return;
+      }
+
+      const assigneeName = task.assignee?.name || 'Unassigned';
+      const assigneeColor = task.assignee?.avatarColor || '#5b57f5';
+      const dueDate = task.dueDate ? fmtDate(task.dueDate) : 'No due date';
+      const summary = taskAiCache.summary;
+      const blockers = summary?.blockers?.length || 0;
+      const decisions = summary?.decisions?.length || taskAiCache.decisions?.length || 0;
+
+      banner.innerHTML = `
+        <div class="selected-task-head">
+          <div class="avatar-row selected-task-title-row">
+            ${avatarHtml(assigneeName, assigneeColor, 'sm')}
+            <div>
+              <div class="task-title">${escapeHtml(task.title)}</div>
+              <div class="task-sub">${escapeHtml(task.projectName || 'Project')} • ${escapeHtml(assigneeName)}</div>
+            </div>
+          </div>
+          <div class="selected-task-meta">
+            <span class="pill pill-muted">Due ${escapeHtml(dueDate)}</span>
+            <span class="pill ${task.status === 'done' ? 'pill-ok' : task.status === 'inprogress' ? 'pill-muted' : 'pill-danger'}">${escapeHtml(task.status === 'inprogress' ? 'In Progress' : task.status === 'done' ? 'Done' : 'To Do')}</span>
+            <span class="pill pill-muted">${escapeHtml(task.priority || 'medium')} priority</span>
+          </div>
+        </div>
+        <div class="selected-task-chips">
+          <span class="metric-chip">Assignee: ${escapeHtml(assigneeName)}</span>
+          <span class="metric-chip">Due: ${escapeHtml(dueDate)}</span>
+          <span class="metric-chip">Blockers: ${escapeHtml(String(blockers))}</span>
+          <span class="metric-chip">Decisions: ${escapeHtml(String(decisions))}</span>
+        </div>
+      `;
+    }
+
+    function populateTaskContextSelector() {
+      const select = document.getElementById('task-context-select');
+      if (!select) return;
+
+      const options = ['<option value="">Choose a task</option>'].concat(
+        tasks.map((task) => `
+          <option value="${task._id}" ${String(task._id) === String(selectedTaskId) ? 'selected' : ''}>
+            ${escapeHtml(task.title)}
+          </option>
+        `)
+      );
+
+      select.innerHTML = options.join('');
+      updateTaskContextStatus();
+    }
+
+    let taskContextExpanded = false;
+
+    function selectTaskContext(taskId) {
+      if (!taskId) {
+        selectedTaskId = '';
+        messages = [];
+        taskAiCache = { summary: null, decisions: null, search: null };
+        renderMessages();
+        updateSelectedTaskBanner();
+        renderTaskAiView();
+        updateTaskContextStatus();
+        return;
+      }
+
+      selectedTaskId = taskId;
+      taskAiCache = { summary: null, decisions: null, search: null };
+      loadTaskMessages(taskId);
+      updateTaskContextStatus();
+      updateSelectedTaskBanner();
+      renderTaskAiView();
+      loadTaskSummary();
+    }
+
+    function toggleTaskContextExpand() {
+      taskContextExpanded = !taskContextExpanded;
+      const mainLayout = document.getElementById('project-main-layout');
+      const panel = document.getElementById('task-context-panel-main');
+      const btn = document.getElementById('task-expand-btn');
+      
+      if (taskContextExpanded) {
+        mainLayout.classList.add('task-context-expanded');
+        panel.classList.add('expanded');
+        btn.textContent = '⤡';
+      } else {
+        mainLayout.classList.remove('task-context-expanded');
+        panel.classList.remove('expanded');
+        btn.textContent = '⤢';
+      }
+    }
+
+    function renderAiEmpty(message) {
+      return `<div class="empty ai-empty">${escapeHtml(message)}</div>`;
+    }
+
+    function normalizeTaskWords(text) {
+      return String(text || '')
+        .toLowerCase()
+        .match(/\b[a-z][a-z0-9_-]{2,}\b/g) || [];
+    }
+
+    function scoreTaskMatch(task, draftText) {
+      const draftWords = new Set(normalizeTaskWords(draftText));
+      if (!draftWords.size) return 0;
+
+      const source = `${task.title || ''} ${task.description || ''} ${task.assignee?.name || ''}`.toLowerCase();
+      const taskWords = normalizeTaskWords(source);
+      let score = 0;
+
+      taskWords.forEach((word) => {
+        if (draftWords.has(word)) score += 2;
+      });
+
+      const text = draftText.toLowerCase();
+      if (task.title && text.includes(task.title.toLowerCase())) score += 6;
+      if (task.description) {
+        const descKeywords = normalizeTaskWords(task.description).slice(0, 8);
+        descKeywords.forEach((word) => {
+          if (draftWords.has(word)) score += 1;
+        });
+      }
+
+      return score;
+    }
+
+    function updateTaskContextSuggestions(draftText) {
+      const container = document.getElementById('task-context-suggestions');
+      if (!container) return;
+
+      const text = String(draftText || '').trim();
+      if (!text || !tasks.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const ranked = tasks
+        .map((task) => ({ task, score: scoreTaskMatch(task, text) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+      if (!ranked.length) {
+        container.innerHTML = '<div class="context-suggestions-empty">AI cannot clearly map this text to a task yet. Pick the task you think fits best, and the summary will still learn from the discussion.</div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="context-suggestions-title">Possible task match${ranked.length > 1 ? 'es' : ''}:</div>
+        <div class="context-suggestions-list">
+          ${ranked.map(({ task }) => `
+            <button type="button" class="context-suggestion-chip" onclick="selectTaskContext('${task._id}')">
+              ${escapeHtml(task.title)}
+            </button>
+          `).join('')}
+        </div>
+        <div class="context-suggestions-note">If the topic touches two tasks, choose the main one here. The summary will keep the related context visible through the chat and notes.</div>
+      `;
+    }
+
+    function renderTaskAiView() {
+      const body = document.getElementById('task-ai-body');
+      if (!body) return;
+
+      const task = getSelectedTask();
+      if (!task) {
+        body.innerHTML = renderAiEmpty('Choose a task to view the conversation summary.');
+        return;
+      }
+
+      if (taskAiView === 'summary') {
+        if (!taskAiCache.summary) {
+          body.innerHTML = `
+            <div class="ai-action-row">
+              <button type="button" class="action-btn" onclick="loadTaskSummary()">Generate Summary</button>
+              <span class="helper-text">AI reads the task chat and turns it into a clear summary of progress, discussion points, blockers, and next steps.</span>
+            </div>
+            ${renderAiEmpty('No summary loaded yet. Click Generate Summary to see the conversation overview.')}
+          `;
+          return;
+        }
+
+        const summary = taskAiCache.summary;
+        body.innerHTML = `
+          <div class="ai-card">
+            <div class="ai-card-head">
+              <div>
+                <div class="task-title">Conversation Summary</div>
+                <div class="task-sub">Generated for ${escapeHtml(task.title)}</div>
+              </div>
+              <span class="pill pill-ok">${escapeHtml(String(summary.messageCount || 0))} messages</span>
+            </div>
+            <div class="card-copy" style="margin-top:12px; line-height:1.75;">${escapeHtml(summary.summary || '')}</div>
+            <div class="ai-action-row" style="margin-top:14px;">
+              <button type="button" class="btn-soft" onclick="loadTaskSummary()">Refresh Summary</button>
+              <span class="helper-text">Refresh after new messages are added.</span>
+            </div>
+          </div>
+          <div class="ai-grid-results">
+            <div class="ai-result-card">
+              <div class="result-card-head">What Was Discussed</div>
+              <div class="ai-chip-list">${(summary.keyPoints || []).map((item) => `<span class="metric-chip">${escapeHtml(item)}</span>`).join('') || '<span class="helper-text">No key points available.</span>'}</div>
+            </div>
+            <div class="ai-result-card">
+              <div class="result-card-head">Blockers and Concerns</div>
+              <div class="ai-subsection">
+                <div class="result-subsection-title">Issues Detected</div>
+                <div class="ai-chip-list">${(summary.identifiedIssues || []).map((item) => `<span class="metric-chip">${escapeHtml(item)}</span>`).join('') || '<span class="helper-text">No issues captured.</span>'}</div>
+              </div>
+              <div class="ai-subsection" style="margin-top:14px;">
+                <div class="result-subsection-title">Blockers</div>
+                <div class="ai-chip-list">${(summary.blockers || []).map((item) => `<span class="metric-chip">${escapeHtml(item)}</span>`).join('') || '<span class="helper-text">No blockers captured.</span>'}</div>
+              </div>
+            </div>
+          </div>
+          <div class="ai-result-card">
+            <div class="result-card-head">What Remains</div>
+            <div class="ai-chip-list">${(summary.pendingWork || []).map((item) => `<span class="metric-chip">${escapeHtml(item)}</span>`).join('') || '<span class="helper-text">Nothing pending in summary yet.</span>'}</div>
+          </div>
+        `;
+        return;
+      }
+    }
+
+    async function loadTaskSummary() {
+      if (!selectedTaskId) return;
+      const summary = await api(`/summaries/task/${selectedTaskId}`);
+      if (!summary) return;
+      taskAiCache.summary = summary;
+      updateSelectedTaskBanner();
+      taskAiView = 'summary';
+      renderTaskAiView();
+      updateTaskContextSuggestions(document.getElementById('message-input')?.value || '');
     }
 
     document.getElementById('create-task-sidebar-btn').classList.toggle('hidden', !isManager);
@@ -607,7 +910,10 @@
         return;
       }
 
-      document.getElementById('task-list').innerHTML = tasks.map((task) => `
+      document.getElementById('task-list').innerHTML = tasks.map((task) => {
+        const isMyTask = String(task.assignee?._id || task.assignee?.id || task.assignee || '') === currentUserId();
+        const canMarkDone = isMyTask && task.status !== 'done';
+        return `
         <div class="task-row" onclick="openTaskModal('${task._id}')">
           <div>
             <div class="task-title">${escapeHtml(task.title)}</div>
@@ -616,10 +922,11 @@
           <div><span class="badge ${task.status === 'done' ? 'done' : task.status === 'inprogress' ? 'progress' : 'todo'}">${task.status === 'inprogress' ? 'In Progress' : task.status === 'done' ? 'Done' : 'To Do'}</span></div>
           <div class="meta-text">${escapeHtml(task.priority)} • ${escapeHtml(String(task.estimatedHours || 0))}h</div>
           <div class="inline-actions">
-            <button class="btn-soft" onclick="event.stopPropagation(); quickDone('${task._id}')">Mark done</button>
+            ${canMarkDone ? `<button class="btn-soft" onclick="event.stopPropagation(); quickDone('${task._id}')">Mark done</button>` : ''}
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     function renderMessages() {
@@ -633,7 +940,23 @@
         return;
       }
 
-      document.getElementById('message-list').innerHTML = messages.map((message) => `
+      renderMessagesTo(document.getElementById('message-list'));
+    }
+
+    function renderMessagesTo(container) {
+      if (!container) return;
+
+      if (!selectedTaskId) {
+        container.innerHTML = '<div class="empty">Select a task to view and post contextual comments.</div>';
+        return;
+      }
+
+      if (!messages.length) {
+        container.innerHTML = '<div class="empty">No comments yet. Add the first task-context note.</div>';
+        return;
+      }
+
+      container.innerHTML = messages.map((message) => `
         <div class="message-row">
           <div class="section-header" style="margin-bottom:0;">
             <div class="avatar-row">
@@ -648,6 +971,30 @@
           <div class="card-copy">${escapeHtml(message.content)}</div>
         </div>
       `).join('');
+    }
+
+    async function sendMessageContent(content) {
+      if (!selectedTaskId) {
+        showToast('Select a task first to post a contextual comment.', 'error');
+        return;
+      }
+
+      if (!content || !content.trim()) {
+        showToast('Enter a message to post.', 'error');
+        return;
+      }
+
+      const response = await api(`/messages/task/${selectedTaskId}`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response) return;
+      showToast('Comment posted.', 'success');
+      await loadTaskMessages(selectedTaskId);
+      renderMessages();
+      renderMessagesFullPage();
+      loadTaskSummary();
     }
 
     function renderActivity() {
@@ -821,11 +1168,15 @@
       availableDevelopers = availableDevData || [];
       health = healthData || { level: 'green', score: 0 };
 
-      updateLowWorkloadUI(document.getElementById('task-assignee')?.value || '');
-
       if (!selectedTaskId && tasks.length) {
         selectedTaskId = tasks[0]._id;
       }
+
+      populateTaskContextSelector();
+      updateTaskContextStatus();
+      updateSelectedTaskBanner();
+
+      updateLowWorkloadUI(document.getElementById('task-assignee')?.value || '');
 
       if (selectedTaskId) {
         await loadTaskMessages(selectedTaskId);
@@ -838,6 +1189,8 @@
       renderMembers();
       renderRisks();
       renderDeveloperInsights();
+      renderTaskAiView();
+      updateSelectedTaskBanner();
     }
 
     function resetTaskForm() {
@@ -935,6 +1288,9 @@
     async function loadTaskMessages(taskId) {
       selectedTaskId = taskId;
       messages = await api(`/messages/task/${taskId}`) || [];
+      populateTaskContextSelector();
+      updateTaskContextStatus();
+      updateSelectedTaskBanner();
       renderMessages();
     }
 
@@ -942,22 +1298,8 @@
       event.preventDefault();
       const textarea = document.getElementById('message-input');
       const content = textarea.value.trim();
-      if (!content) return;
-
-      if (!selectedTaskId) {
-        showToast('Select a task first to post a contextual comment.', 'error');
-        return;
-      }
-
-      const response = await api(`/messages/task/${selectedTaskId}`, {
-        method: 'POST',
-        body: JSON.stringify({ content }),
-      });
-
-      if (!response) return;
       textarea.value = '';
-      showToast('Comment posted.', 'success');
-      loadTaskMessages(selectedTaskId);
+      await sendMessageContent(content);
     }
 
     async function addMember(event) {
