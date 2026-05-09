@@ -3,6 +3,8 @@ const Message = require('../models/Message');
 const Task = require('../models/Task');
 const Activity = require('../models/Activity');
 const { buildConvertedTaskFromMessage } = require('../services/messageService');
+const ConversationSummaryService = require('../services/conversationSummaryService');
+const SemanticSearchService = require('../services/semanticSearchService');
 
 async function canAccessProject(projectId, userId) {
   return Project.exists({ _id: projectId, 'members.user': userId });
@@ -67,6 +69,12 @@ async function sendTaskMessage(req, res) {
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'name avatarColor title')
       .populate('convertedToTask', 'title status');
+
+    // Invalidate summary since new message was added
+    await ConversationSummaryService.markSummaryStale(task._id);
+
+    // Index the new message for search
+    await SemanticSearchService.indexMessage(message._id, 'discussion');
 
     return res.status(201).json(populatedMessage);
   } catch (err) {

@@ -14,6 +14,9 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/myday', require('./routes/myday'));
+app.use('/api/summaries', require('./routes/summaries'));
+app.use('/api/decisions', require('./routes/decisions'));
+app.use('/api/search', require('./routes/search'));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', 'landing.html'));

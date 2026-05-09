@@ -50,8 +50,13 @@
 
       <section class="content">
         <div class="toolbar">
-          <div class="search-box">
-            <input id="search-input" placeholder="Search tasks..." oninput="renderTasks()">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <input id="search-input" placeholder="Search tasks..." oninput="renderTasks()">
+            </div>
+            <div class="search-box project-filter-box" style="min-width:240px;">
+              <select id="project-filter" onchange="setProjectFilter(this.value)"></select>
+            </div>
           </div>
           <div class="toolbar-actions">
             <button class="btn-soft" onclick="setFilter('all')">Reset Filters</button>
@@ -155,7 +160,22 @@
     let projects = [];
     let tasks = [];
     let statusFilter = 'all';
+    let selectedProjectFilter = 'all';
     let taskMonitor = { tasks: [], summary: { total: 0, done: 0, active: 0, overdue: 0, stale: 0 } };
+
+    function currentUserId() {
+      return String(user.id || user._id || '');
+    }
+
+    function isMyTask(task) {
+      const assigneeId = task?.assignee?._id || task?.assignee?.id || task?.assignee;
+      return String(assigneeId || '') === currentUserId();
+    }
+
+    function getScopedTasks() {
+      if (selectedProjectFilter === 'all') return tasks;
+      return tasks.filter((task) => String(task.projectId) === String(selectedProjectFilter));
+    }
 
     function taskStatusLabel(status) {
       if (status === 'inprogress') return 'In Progress';
@@ -164,10 +184,11 @@
     }
 
     function renderTabs() {
-      const all = tasks.length;
-      const todo = tasks.filter((task) => task.status === 'todo').length;
-      const inprogress = tasks.filter((task) => task.status === 'inprogress').length;
-      const done = tasks.filter((task) => task.status === 'done').length;
+      const scoped = getScopedTasks();
+      const all = scoped.length;
+      const todo = scoped.filter((task) => task.status === 'todo').length;
+      const inprogress = scoped.filter((task) => task.status === 'inprogress').length;
+      const done = scoped.filter((task) => task.status === 'done').length;
 
       document.getElementById('tab-row').innerHTML = `
         <button class="tab-chip ${statusFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">All (${all})</button>
@@ -179,6 +200,32 @@
 
     function setFilter(next) {
       statusFilter = next;
+      renderTabs();
+      renderTasks();
+    }
+
+    function populateProjectFilterOptions() {
+      const select = document.getElementById('project-filter');
+      if (!select) return;
+
+      const baseOptions = isManager
+        ? ['<option value="all">All Projects</option>']
+        : [];
+
+      const projectOptions = projects.map((project) => `
+        <option value="${project._id}" ${String(project._id) === String(selectedProjectFilter) ? 'selected' : ''}>${escapeHtml(project.name)}</option>
+      `);
+
+      select.innerHTML = baseOptions.concat(projectOptions).join('');
+
+      if (!isManager && projects.length && !selectedProjectFilter) {
+        selectedProjectFilter = projects[0]._id;
+        select.value = selectedProjectFilter;
+      }
+    }
+
+    function setProjectFilter(projectId) {
+      selectedProjectFilter = projectId;
       renderTabs();
       renderTasks();
     }
@@ -267,7 +314,7 @@
 
     function renderTasks() {
       const query = document.getElementById('search-input').value.trim().toLowerCase();
-      const list = tasks
+      const list = getScopedTasks()
         .filter((task) => statusFilter === 'all' || task.status === statusFilter)
         .filter((task) => {
           return task.title.toLowerCase().includes(query)
@@ -289,8 +336,11 @@
           <div><span class="badge ${task.status === 'done' ? 'done' : task.status === 'inprogress' ? 'progress' : 'todo'}">${taskStatusLabel(task.status)}</span></div>
           <div class="meta-text">${escapeHtml(task.priority)}</div>
           <div class="inline-actions">
+            ${isMyTask(task) ? '<span class="pill pill-ok">Mine</span>' : ''}
             <span class="helper-text">${task.dueDate ? fmtDate(task.dueDate) : 'No date'}</span>
-            <button class="btn-soft" onclick="event.stopPropagation(); quickDone('${task._id}')">Mark done</button>
+            ${isManager || isMyTask(task)
+              ? `<button class="btn-soft" onclick="event.stopPropagation(); quickDone('${task._id}')">Mark done</button>`
+              : ''}
           </div>
         </div>
       `).join('');
@@ -357,6 +407,15 @@
         projectId: projects[index]._id,
         projectName: projects[index].name,
       })));
+
+      if (!isManager) {
+        if (!selectedProjectFilter || selectedProjectFilter === 'all') {
+          selectedProjectFilter = projects[0]?._id || 'all';
+        }
+      }
+
+      populateProjectFilterOptions();
+
       if (isManager) {
         taskMonitor = await api('/projects/manager/task-monitor') || taskMonitor;
         renderTaskMonitor(taskMonitor);

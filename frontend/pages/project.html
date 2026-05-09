@@ -96,7 +96,7 @@
             </div>
           </div>
 
-          <div class="stack">
+          <div class="stack" id="manager-side-panels">
             <div class="panel">
               <div class="section-header" style="margin-bottom:10px;">
                 <div>
@@ -112,6 +112,20 @@
               <div class="panel-title">Risk Watch</div>
               <div class="panel-copy">Tasks that need attention because they are overdue, stale, or due soon.</div>
               <div class="list" id="risk-list" style="margin-top:18px;"></div>
+            </div>
+          </div>
+
+          <div class="stack hidden" id="developer-side-panels">
+            <div class="panel">
+              <div class="panel-title">My Assignment Snapshot</div>
+              <div class="panel-copy">A quick overview of your assigned tasks, urgency, and current workload status.</div>
+              <div class="list" id="developer-focus-list" style="margin-top:18px;"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">My Upcoming Deadlines</div>
+              <div class="panel-copy">Your next due tasks so you can prioritize execution without opening each task card.</div>
+              <div class="list" id="developer-deadline-list" style="margin-top:18px;"></div>
             </div>
           </div>
         </div>
@@ -250,9 +264,20 @@
     let selectedTaskId = '';
     let pendingTaskSubmission = null;
 
+    function currentUserId() {
+      return String(user.id || user._id || '');
+    }
+
+    function isMyTask(task) {
+      const assigneeId = task?.assignee?._id || task?.assignee?.id || task?.assignee;
+      return String(assigneeId || '') === currentUserId();
+    }
+
     document.getElementById('create-task-sidebar-btn').classList.toggle('hidden', !isManager);
     document.getElementById('new-task-panel-btn').classList.toggle('hidden', !isManager);
     document.getElementById('low-workload-btn').classList.toggle('hidden', !isManager);
+    document.getElementById('manager-side-panels').classList.toggle('hidden', !isManager);
+    document.getElementById('developer-side-panels').classList.toggle('hidden', isManager);
 
     function closeModal(id) {
       document.getElementById(id).classList.remove('open');
@@ -692,6 +717,85 @@
       `).join('');
     }
 
+    function renderDeveloperInsights() {
+      if (isManager) return;
+
+      const focusList = document.getElementById('developer-focus-list');
+      const deadlineList = document.getElementById('developer-deadline-list');
+      if (!focusList || !deadlineList) return;
+
+      const now = Date.now();
+      const mine = tasks.filter((task) => isMyTask(task));
+      const active = mine.filter((task) => task.status !== 'done');
+      const done = mine.filter((task) => task.status === 'done');
+      const dueSoon = active.filter((task) => {
+        if (!task.dueDate) return false;
+        const diff = new Date(task.dueDate).getTime() - now;
+        return diff >= 0 && diff <= 48 * 60 * 60 * 1000;
+      });
+      const overdue = active.filter((task) => task.dueDate && new Date(task.dueDate).getTime() < now);
+
+      const myWorkload = (workload || []).find((entry) => String(entry.user?._id || entry.user?.id || '') === currentUserId());
+      const availability = String(myWorkload?.availability || 'light').toLowerCase();
+      const availabilityTone = availability === 'free' || availability === 'light'
+        ? 'pill-ok'
+        : availability === 'busy'
+          ? 'pill-muted'
+          : 'pill-danger';
+
+      focusList.innerHTML = `
+        <div class="list-row">
+          <div class="task-title">My current load</div>
+          <div class="warning-metrics">
+            <span class="metric-chip">${escapeHtml(String(mine.length))} assigned</span>
+            <span class="metric-chip">${escapeHtml(String(active.length))} active</span>
+            <span class="metric-chip">${escapeHtml(String(done.length))} done</span>
+            <span class="metric-chip">${escapeHtml(String(dueSoon.length))} due in 48h</span>
+            <span class="metric-chip">${escapeHtml(String(overdue.length))} overdue</span>
+          </div>
+        </div>
+        <div class="list-row">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <div class="task-title">Workload status</div>
+              <div class="task-sub">Based on your active and urgent task pressure in this project.</div>
+            </div>
+            <span class="pill ${availabilityTone}">${escapeHtml(availability.toUpperCase())}</span>
+          </div>
+        </div>
+      `;
+
+      const upcoming = active
+        .filter((task) => task.dueDate)
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+        .slice(0, 5);
+
+      if (!upcoming.length) {
+        deadlineList.innerHTML = '<div class="empty">No upcoming personal deadlines. You are clear for now.</div>';
+        return;
+      }
+
+      deadlineList.innerHTML = upcoming.map((task) => {
+        const dueAt = new Date(task.dueDate).getTime();
+        const isOverdue = dueAt < now;
+        const isDueSoon = !isOverdue && (dueAt - now) <= 48 * 60 * 60 * 1000;
+        const tone = isOverdue ? 'pill-danger' : isDueSoon ? 'pill-muted' : 'pill-ok';
+        const label = isOverdue ? 'Overdue' : isDueSoon ? 'Due soon' : 'Planned';
+
+        return `
+          <div class="list-row">
+            <div class="section-header" style="margin-bottom:0;">
+              <div>
+                <div class="task-title">${escapeHtml(task.title)}</div>
+                <div class="task-sub">Due ${escapeHtml(fmtDate(task.dueDate))} • ${escapeHtml(task.priority || 'medium')} priority</div>
+              </div>
+              <span class="pill ${tone}">${label}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     async function loadWorkspace() {
       const [projectData, taskData, activityData, riskData, workloadData, healthData, availableDevData] = await Promise.all([
         api(`/projects/${projectId}`),
@@ -733,6 +837,7 @@
       renderActivity();
       renderMembers();
       renderRisks();
+      renderDeveloperInsights();
     }
 
     function resetTaskForm() {
